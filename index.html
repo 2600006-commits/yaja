@@ -65,6 +65,9 @@
     width:100%; padding:11px 14px; border-radius:999px; border:1px solid rgba(120,120,128,0.25);
     background:rgba(255,255,255,0.7); font-size:13px; font-family:inherit;
   }
+  .search-result-item{ padding:10px 14px; background:rgba(255,255,255,0.9); font-size:13px; cursor:pointer; border-bottom:1px solid rgba(120,120,128,0.15); }
+  .search-result-item:last-child{ border-bottom:none; }
+  .search-result-item:active{ background:rgba(120,120,128,0.18); }
 
   .legend{ display:flex; gap:14px; flex-wrap:wrap; padding:10px 20px; font-size:12px; color:var(--text-secondary); margin:0 12px 12px; border-radius:var(--radius-lg);}
   .legend span{ display:flex; align-items:center; gap:6px;}
@@ -94,6 +97,8 @@
   .desk.present{ --seat-rgb:52,199,89; }
   .desk.away{ --seat-rgb:255,204,0; }
   .desk.left{ --seat-rgb:255,59,48; }
+  .desk.present.late{ --seat-rgb:255,149,0; }
+  .desk .expected-dot{ position:absolute; top:5px; right:6px; width:7px; height:7px; border-radius:50%; background:#0a84ff; }
   .desk .badge{ font-size:8px; color:var(--text-secondary); opacity:.75;}
   .desk .d-name{ font-size:11px; font-weight:600; line-height:1.2; }
   .desk .d-time{ font-size:8px; color:var(--text-secondary); line-height:1.3;}
@@ -157,6 +162,28 @@
   .schedule-grid .day{ font-weight:600; }
   .muted{ color:var(--text-secondary); font-size:12px; }
   .close-x{ position:absolute; top:16px; right:16px; background:rgba(120,120,128,0.16); border:none; width:30px; height:30px; border-radius:50%; font-size:14px; cursor:pointer;}
+
+  /* ---------------- 다크 모드 ---------------- */
+  body.dark{
+    background:linear-gradient(135deg,#0b0f1a 0%,#151225 45%,#1a1015 100%);
+    color:#f2f2f5;
+  }
+  body.dark .glass{
+    background:rgba(30,30,38,0.6);
+    border:1px solid rgba(255,255,255,0.12);
+    box-shadow:0 8px 32px rgba(0,0,0,0.4);
+  }
+  body.dark{ --text-primary:#f2f2f5; --text-secondary:#a3a3ad; }
+  body.dark .field input, body.dark .field select, body.dark textarea,
+  body.dark .search-row input{
+    background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.15); color:#f2f2f5;
+  }
+  body.dark .list-item, body.dark .search-result-item{ background:rgba(255,255,255,0.06); color:#f2f2f5; }
+  body.dark .btn-secondary{ background:rgba(255,255,255,0.12); color:#f2f2f5; }
+  body.dark .tabbar button{ background:rgba(255,255,255,0.1); color:#f2f2f5; }
+  body.dark .desk{ box-shadow:0 2px 10px rgba(0,0,0,0.35); }
+  body.dark .desk .d-name{ color:#fff; }
+  body.dark .grid-dot{ background:rgba(255,255,255,0.25); }
 </style>
 </head>
 <body>
@@ -168,6 +195,7 @@
   </div>
   <div class="header-actions">
     <span class="muted"><span class="dot off" id="serialDot"></span><span id="serialLabel">기기 미연결</span></span>
+    <button class="btn btn-secondary" id="btnDarkToggle">🌙</button>
     <button class="btn btn-secondary" id="btnRules">야자 규정</button>
     <button class="btn btn-secondary" id="btnSimulate">지문 시뮬레이션</button>
     <button class="btn btn-primary" id="btnAdmin">관리자 모드</button>
@@ -182,11 +210,15 @@
 
 <div class="search-row">
   <input id="studentSearch" placeholder="학생 이름으로 검색">
+  <div id="searchResults" style="display:none;margin-top:6px;border-radius:16px;overflow:hidden;"></div>
 </div>
+
+<div id="todaySummary" class="muted" style="margin:0 12px 10px;font-size:12px;"></div>
 
 <div class="legend glass">
   <span><i style="background:#8e8e93"></i>미입실</span>
   <span><i style="background:#34c759"></i>재실</span>
+  <span><i style="background:#ff9500"></i>지각</span>
   <span><i style="background:#ffcc00"></i>자리비움</span>
   <span><i style="background:#ff3b30"></i>퇴실</span>
   <span>▢ 칸막이 / ◯ 오픈형</span>
@@ -212,6 +244,7 @@
     <button class="fab-item" data-action="students">학생 관리</button>
     <button class="fab-item" data-action="layout">좌석 배치 모드</button>
     <button class="fab-item" data-action="rules">규정 관리</button>
+    <button class="fab-item" data-action="ranking">랭킹</button>
     <button class="fab-item" data-action="device">기기 연결</button>
     <button class="fab-item" data-action="backup">백업 / 복원</button>
     <button class="fab-item" data-action="password">비밀번호 변경</button>
@@ -258,6 +291,7 @@
       <button class="tabbtn active" data-tab="students">학생 관리</button>
       <button class="tabbtn" data-tab="layout">좌석 배치</button>
       <button class="tabbtn" data-tab="rules">규정 관리</button>
+      <button class="tabbtn" data-tab="ranking">랭킹</button>
       <button class="tabbtn" data-tab="device">기기 연결</button>
       <button class="tabbtn" data-tab="password">비밀번호</button>
       <button class="tabbtn" data-tab="backup">백업/복원</button>
@@ -273,18 +307,10 @@
         <div class="field"><label>지문 ID</label><input id="newFp" type="number" min="1" max="199"></div>
       </div>
       <div class="field"><label>월 목표시간(분)</label><input id="newGoal" type="number" value="1200"></div>
-      <div class="field"><label>자율학습 요일</label>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:13px;">
-          <label><input type="checkbox" class="regDay" value="mon"> 월</label>
-          <label><input type="checkbox" class="regDay" value="tue"> 화</label>
-          <label><input type="checkbox" class="regDay" value="wed"> 수</label>
-          <label><input type="checkbox" class="regDay" value="thu"> 목</label>
-          <label><input type="checkbox" class="regDay" value="fri"> 금</label>
+      <div class="field"><label>자율학습 요일 및 시간</label>
+        <div class="schedule-grid" id="regScheduleGrid">
+          <div></div><div class="muted" style="font-size:11px;">신청</div><div class="muted" style="font-size:11px;">시간</div>
         </div>
-      </div>
-      <div class="row">
-        <div class="field"><label>시작 시간</label><input type="time" id="newStart" value="18:00"></div>
-        <div class="field"><label>종료 시간</label><input type="time" id="newEnd" value="21:00"></div>
       </div>
       <button class="btn btn-primary" id="addStudentBtn" style="width:100%">학생 추가</button>
     </div>
@@ -300,6 +326,14 @@
       <h3>좌석 배치 모드</h3>
       <p class="muted">1층/2층에 칸막이·오픈형 책상을 자유롭게 추가·이동·삭제할 수 있습니다. 실제 화면 위에서 바로 편집합니다.</p>
       <button class="btn btn-primary" id="startLayoutBtn" style="width:100%">좌석 배치 모드 시작</button>
+      <h3>좌석표 내보내기</h3>
+      <button class="btn btn-secondary" id="exportSeatImageBtn" style="width:100%">현재 층 좌석표 이미지로 저장</button>
+    </div>
+
+    <div class="tabpane" id="tab-ranking">
+      <h3>이번 달 랭킹</h3>
+      <p class="muted">누적 순공부시간 기준입니다. 학생들에게는 공개되지 않고 관리자만 볼 수 있어요.</p>
+      <div id="rankingList"></div>
     </div>
 
     <div class="tabpane" id="tab-device">
@@ -387,6 +421,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
 (function(){
   'use strict';
@@ -465,13 +500,31 @@
 
   function defaultWeekly(){ const w={}; DAYS.forEach(([k])=>w[k]={enabled:false,start:'18:00',end:'21:00'}); return w; }
 
+  function buildRegScheduleGrid(){
+    const grid = $('#regScheduleGrid');
+    DAYS.forEach(([key,label]) => {
+      const dayEl = document.createElement('div'); dayEl.className = 'day'; dayEl.textContent = label;
+      const cbWrap = document.createElement('div');
+      cbWrap.innerHTML = `<input type="checkbox" class="regDay" data-day="${key}">`;
+      const timeWrap = document.createElement('div');
+      timeWrap.innerHTML = `<input type="time" class="regStart" data-day="${key}" value="18:00" style="width:70px;display:inline-block;padding:4px;"> ~ <input type="time" class="regEnd" data-day="${key}" value="21:00" style="width:70px;display:inline-block;padding:4px;">`;
+      grid.appendChild(dayEl); grid.appendChild(cbWrap); grid.appendChild(timeWrap);
+    });
+  }
+  function resetRegScheduleGrid(){
+    $$('.regDay').forEach(cb => cb.checked = false);
+    $$('.regStart').forEach(inp => inp.value = '18:00');
+    $$('.regEnd').forEach(inp => inp.value = '21:00');
+  }
+
   async function loadSettings(){
     settings = await dbGet('settings','app');
     if(!settings){
-      settings = { key:'app', adminPassword:'0000', currentDate: todayStr(), studyEndTime:'22:00', lastBackupReminderDate:null, rulesText:'' };
+      settings = { key:'app', adminPassword:'0000', currentDate: todayStr(), studyEndTime:'22:00', lastBackupReminderDate:null, rulesText:'', darkMode:false };
       await dbPut('settings', settings);
     }
     if(settings.rulesText === undefined) settings.rulesText = ''; // 이전 버전 데이터 호환
+    if(settings.darkMode === undefined) settings.darkMode = false;
   }
   async function saveSettings(){ await dbPut('settings', settings); }
   async function loadStudents(){ students = await dbGetAll('students'); }
@@ -631,17 +684,28 @@
     }
     const floorDesks = desks.filter(d => d.floor === currentFloor);
     let presentCount = 0;
+    const todayKey = todayDayKey();
     for(const desk of floorDesks){
       const student = findStudentByDesk(desk.id);
       const cell = document.createElement('div');
       let status = 'empty';
       let record = null;
+      let isLate = false;
+      let expectedNotArrived = false;
       if(student){
         record = await getTodayAttendance(student.id);
         status = record ? record.status : 'empty';
         if(status === 'present') presentCount++;
+        const todaySchedule = student.weeklySchedule[todayKey];
+        if(record && (status==='present' || status==='left') && todaySchedule && todaySchedule.enabled){
+          const checkInTime = new Date(record.checkIn);
+          const [sh,sm] = todaySchedule.start.split(':').map(Number);
+          const scheduledStart = new Date(checkInTime); scheduledStart.setHours(sh,sm,0,0);
+          if(checkInTime > scheduledStart) isLate = true;
+        }
+        if(!record && todaySchedule && todaySchedule.enabled) expectedNotArrived = true;
       }
-      cell.className = 'desk type-' + desk.type + ' ' + status;
+      cell.className = 'desk type-' + desk.type + ' ' + status + (isLate ? ' late' : '');
       const pos = cellToPos(desk.col, desk.row);
       cell.style.left = pos.x+'px'; cell.style.top = pos.y+'px';
       if(student){
@@ -658,6 +722,7 @@
           <div class="d-time">${checkIn}~${checkOut}<br>${elapsedMin}분</div>
           <div class="goal-bar"><div class="goal-fill" style="width:${pct}%"></div></div>`;
         cell.dataset.studentName = student.name;
+        if(expectedNotArrived){ const dot = document.createElement('span'); dot.className='expected-dot'; dot.title='오늘 신청함'; cell.appendChild(dot); }
       } else {
         cell.innerHTML = `<span class="badge">${desk.type==='partition'?'칸막이':'오픈형'}</span><div class="muted" style="font-size:10px;">미배정</div>`;
       }
@@ -667,6 +732,7 @@
       canvas.appendChild(cell);
     }
     $('#floorSummary').textContent = `재실 ${presentCount} / 전체 ${floorDesks.length}`;
+    renderTodaySummary();
   }
 
   function attachDeskEvents(cell, desk){
@@ -717,19 +783,97 @@
     addDesk(currentFloor, newDeskType, slot.col, slot.row);
   });
 
+  /* ---------------- 랭킹 ---------------- */
+  const monthStr = () => new Date().toISOString().slice(0,7);
+  const DAY_KEYS = ['sun','mon','tue','wed','thu','fri','sat'];
+  function todayDayKey(){ return DAY_KEYS[new Date().getDay()]; }
+  async function computeRanking(){
+    const attendance = await dbGetAll('attendance');
+    const mPrefix = monthStr();
+    const now = new Date();
+    const monthDates = [];
+    for(let d=1; d<=now.getDate(); d++){ monthDates.push(new Date(now.getFullYear(), now.getMonth(), d)); }
+    return students.map(s => {
+      const scheduledDays = monthDates.filter(d => {
+        const key = DAY_KEYS[d.getDay()];
+        return s.weeklySchedule[key] && s.weeklySchedule[key].enabled;
+      }).length;
+      const attendedDates = new Set(attendance.filter(a => a.studentId===s.id && a.date.startsWith(mPrefix)).map(a=>a.date));
+      const attendedDays = attendedDates.size;
+      const rate = scheduledDays>0 ? Math.round(attendedDays/scheduledDays*100) : 0;
+      const totalMin = Math.round((s.monthlyElapsedSeconds||0)/60);
+      return { name:s.name, totalMin, attendedDays, scheduledDays, rate };
+    }).sort((a,b) => b.totalMin - a.totalMin);
+  }
+  async function renderRanking(){
+    const ranking = await computeRanking();
+    const list = $('#rankingList');
+    if(ranking.length===0){ list.innerHTML = '<p class="muted">등록된 학생이 없습니다.</p>'; return; }
+    list.innerHTML = ranking.map((r,i) => `
+      <div class="list-item">
+        <span><b>${i+1}위</b> ${r.name} · ${Math.floor(r.totalMin/60)}시간 ${r.totalMin%60}분</span>
+        <span class="muted">출석률 ${r.rate}% (${r.attendedDays}/${r.scheduledDays}일)</span>
+      </div>`).join('');
+  }
+
+  /* ---------------- 오늘 신청 현황 / 지각 판정 ---------------- */
+  function isScheduledToday(student){
+    const d = student.weeklySchedule[todayDayKey()];
+    return d && d.enabled;
+  }
+  async function renderTodaySummary(){
+    const key = todayDayKey();
+    const scheduled = students.filter(s => s.weeklySchedule[key] && s.weeklySchedule[key].enabled);
+    let arrived = 0;
+    for(const s of scheduled){ const r = await getTodayAttendance(s.id); if(r) arrived++; }
+    if(scheduled.length===0){ $('#todaySummary').textContent = '오늘 자율학습 신청자가 없습니다.'; return; }
+    $('#todaySummary').textContent = `오늘 신청 ${scheduled.length}명 중 ${arrived}명 입실`;
+  }
+
+  /* ---------------- 좌석표 이미지 저장 ---------------- */
+  $('#exportSeatImageBtn').addEventListener('click', async () => {
+    const wasEditing = layoutEditMode;
+    if(wasEditing){ layoutEditMode = false; await renderFloor(); }
+    try{
+      const shot = await html2canvas($('#deskCanvas'), { backgroundColor:'#ffffff' });
+      const link = document.createElement('a');
+      link.download = `좌석표_${currentFloor}층_${todayStr()}.png`;
+      link.href = shot.toDataURL('image/png');
+      link.click();
+    }catch(e){ await showMessage('이미지 저장 실패: '+e.message); }
+    if(wasEditing){ layoutEditMode = true; await renderFloor(); }
+  });
+
   /* ---------------- 학생 검색 ---------------- */
-  $('#studentSearch').addEventListener('input', e => {
-    const q = e.target.value.trim().toLowerCase();
-    if(!q) return;
-    const student = students.find(s => s.name.toLowerCase().includes(q));
+  function jumpToStudentDesk(student){
+    $('#searchResults').style.display = 'none';
     if(!student || student.deskId == null) return;
     const desk = findDesk(student.deskId);
     if(!desk) return;
     if(desk.floor !== currentFloor) selectFloor(desk.floor);
     setTimeout(() => {
-      const el = document.querySelector(`.desk[data-desk-id="${desk.id}"]`) || Array.from(document.querySelectorAll('.desk')).find(d=>d.dataset.deskId==desk.id);
+      const el = Array.from(document.querySelectorAll('.desk')).find(d => d.dataset.deskId == desk.id);
       if(el){ el.classList.add('highlight'); el.scrollIntoView({behavior:'smooth', block:'center'}); setTimeout(()=>el.classList.remove('highlight'), 2000); }
     }, 150);
+  }
+  $('#studentSearch').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    const resultsBox = $('#searchResults');
+    if(!q){ resultsBox.style.display = 'none'; return; }
+    const matches = students.filter(s => s.name.toLowerCase().includes(q));
+    if(matches.length === 0){ resultsBox.style.display = 'none'; return; }
+    if(matches.length === 1){ jumpToStudentDesk(matches[0]); return; }
+    resultsBox.innerHTML = matches.map(s => {
+      const desk = s.deskId!=null ? findDesk(s.deskId) : null;
+      return `<div class="search-result-item glass" data-sid="${s.id}">${s.name} · ${desk?deskLabel(desk):'미배정'}</div>`;
+    }).join('');
+    resultsBox.style.display = 'block';
+    $$('#searchResults [data-sid]').forEach(item => {
+      item.addEventListener('click', () => {
+        const st = students.find(s => s.id === parseInt(item.dataset.sid));
+        jumpToStudentDesk(st);
+      });
+    });
   });
 
   /* ---------------- 좌석 상세 모달 ---------------- */
@@ -817,12 +961,16 @@
     }
   }
   document.addEventListener('click', resetAdminIdleTimer);
+  document.addEventListener('click', e => {
+    if(!e.target.closest('#searchResults') && e.target.id !== 'studentSearch'){ $('#searchResults').style.display = 'none'; }
+  });
 
   function openAdminPanel(tab){
     $$('.tabbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
     $$('.tabpane').forEach(p=>p.classList.toggle('active', p.id==='tab-'+tab));
     if(tab==='students'){ renderAdminStudentList(); renderDeskOptions(); }
     if(tab==='rules'){ $('#rulesTextarea').value = settings.rulesText || ''; }
+    if(tab==='ranking'){ renderRanking(); }
     openOverlay('ovAdmin');
   }
 
@@ -858,6 +1006,17 @@
   });
 
   $$('.tabbtn').forEach(btn => btn.addEventListener('click', () => openAdminPanel(btn.dataset.tab)));
+
+  /* ---- 다크 모드 ---- */
+  function applyDarkMode(){
+    document.body.classList.toggle('dark', settings.darkMode);
+    $('#btnDarkToggle').textContent = settings.darkMode ? '☀️' : '🌙';
+  }
+  $('#btnDarkToggle').addEventListener('click', async () => {
+    settings.darkMode = !settings.darkMode;
+    await saveSettings();
+    applyDarkMode();
+  });
 
   /* ---- 야자 규정 ---- */
   $('#saveRulesBtn').addEventListener('click', async () => {
@@ -902,15 +1061,17 @@
     const goal = parseInt($('#newGoal').value) || 1200;
     if(!name || !fp){ await showMessage('이름과 지문 ID를 입력해주세요.'); return; }
     if(findStudentByFp(fp)){ await showMessage('이미 사용 중인 지문 ID입니다.'); return; }
-    const start = $('#newStart').value || '18:00';
-    const end = $('#newEnd').value || '21:00';
     const weeklySchedule = defaultWeekly();
-    $$('.regDay:checked').forEach(cb => { weeklySchedule[cb.value] = { enabled: true, start, end }; });
-    await dbPut('students', { name, deskId, fingerprintId: fp, weeklySchedule, monthlyGoalMinutes: goal, monthlyElapsedSeconds:0 });
+    DAYS.forEach(([key]) => {
+      const cb = document.querySelector(`.regDay[data-day="${key}"]`);
+      const st = document.querySelector(`.regStart[data-day="${key}"]`);
+      const et = document.querySelector(`.regEnd[data-day="${key}"]`);
+      weeklySchedule[key] = { enabled: cb.checked, start: st.value || '18:00', end: et.value || '21:00' };
+    });
+    await dbPut('students', { name, deskId, fingerprintId: fp, weeklySchedule, monthlyGoalMinutes: goal, monthlyElapsedSeconds:0, monthlyHistory:{} });
     await loadStudents();
     $('#newName').value=''; $('#newFp').value=''; $('#newGoal').value=1200;
-    $$('.regDay').forEach(cb => cb.checked = false);
-    $('#newStart').value='18:00'; $('#newEnd').value='21:00';
+    resetRegScheduleGrid();
     renderAdminStudentList(); renderDeskOptions(); renderFloor();
   });
 
@@ -1017,7 +1178,13 @@
     const today = todayStr();
     if(settings.currentDate !== today){
       if(settings.currentDate.slice(0,7) !== today.slice(0,7)){
-        for(const s of students){ s.monthlyElapsedSeconds = 0; await dbPut('students', s); }
+        const prevMonth = settings.currentDate.slice(0,7);
+        for(const s of students){
+          if(!s.monthlyHistory) s.monthlyHistory = {};
+          s.monthlyHistory[prevMonth] = s.monthlyElapsedSeconds || 0;
+          s.monthlyElapsedSeconds = 0;
+          await dbPut('students', s);
+        }
         await loadStudents();
       }
       settings.currentDate = today; await saveSettings(); renderFloor();
@@ -1031,6 +1198,8 @@
     if(navigator.storage && navigator.storage.persist) navigator.storage.persist();
     db = await openDB();
     await loadSettings();
+    applyDarkMode();
+    buildRegScheduleGrid();
     await ensureDeskSchema();
     await loadStudents(); await loadDesks();
     renderFloor(); updateClock();
