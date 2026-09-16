@@ -79,7 +79,11 @@
     -webkit-overflow-scrolling:touch;
   }
   .canvas-scroll.editing{ box-shadow: inset 0 0 0 3px rgba(10,132,255,0.5); }
-  .canvas{ position:relative; }
+  #canvasViewport{ position:relative; }
+  .canvas{ position:absolute; top:0; left:0; }
+  .fit-toggle{ margin:0 12px 10px; text-align:right; }
+  .fit-toggle button{ border:none; background:rgba(120,120,128,0.14); padding:6px 14px; border-radius:999px; font-size:11px; cursor:pointer; font-family:inherit; color:var(--text-primary); }
+  .fit-toggle button.active{ background:var(--accent); color:#fff; }
   .grid-dot{ position:absolute; width:6px; height:6px; border-radius:50%; background:rgba(120,120,128,0.35); transform:translate(-50%,-50%); pointer-events:none; }
   #editHint{ margin:0 12px 10px; font-size:12px; color:var(--text-secondary); display:none; }
 
@@ -99,6 +103,7 @@
   .desk.left{ --seat-rgb:255,59,48; }
   .desk.present.late{ --seat-rgb:255,149,0; }
   .desk .expected-dot{ position:absolute; top:5px; right:6px; width:7px; height:7px; border-radius:50%; background:#0a84ff; }
+  .desk .goal-badge{ position:absolute; top:3px; left:6px; font-size:11px; line-height:1; filter:drop-shadow(0 1px 1px rgba(0,0,0,0.25)); }
   .desk .badge{ font-size:8px; color:var(--text-secondary); opacity:.75;}
   .desk .d-name{ font-size:11px; font-weight:600; line-height:1.2; }
   .desk .d-time{ font-size:8px; color:var(--text-secondary); line-height:1.3;}
@@ -158,8 +163,13 @@
   .tabbar button.active{ background:var(--accent); color:#fff; }
   .tabpane{ display:none; } .tabpane.active{ display:block; }
   .list-item{ display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-radius:var(--radius-sm); background:rgba(255,255,255,0.5); margin-bottom:8px; font-size:13px;}
-  .schedule-grid{ display:grid; grid-template-columns:44px 1fr 1fr; gap:6px; align-items:center; font-size:12px;}
-  .schedule-grid .day{ font-weight:600; }
+  .day-sched-row{ background:rgba(255,255,255,0.5); border-radius:14px; padding:10px 12px; margin-bottom:8px; }
+  .day-sched-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .day-toggle{ display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; cursor:pointer; }
+  .day-toggle input{ width:18px; height:18px; }
+  .day-sched-time{ margin-top:8px; display:flex; align-items:center; gap:6px; font-size:13px; }
+  .day-sched-time select{ flex:1; min-width:0; padding:9px 6px; border-radius:10px; border:1px solid rgba(120,120,128,0.25); background:rgba(255,255,255,0.8); font-family:inherit; font-size:13px; }
+  .day-sched-time .tilde{ color:var(--text-secondary); flex:none; }
   .muted{ color:var(--text-secondary); font-size:12px; }
   .close-x{ position:absolute; top:16px; right:16px; background:rgba(120,120,128,0.16); border:none; width:30px; height:30px; border-radius:50%; font-size:14px; cursor:pointer;}
 
@@ -179,6 +189,8 @@
     background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.15); color:#f2f2f5;
   }
   body.dark .list-item, body.dark .search-result-item{ background:rgba(255,255,255,0.06); color:#f2f2f5; }
+  body.dark .day-sched-row{ background:rgba(255,255,255,0.06); }
+  body.dark .day-sched-time select{ background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.15); color:#f2f2f5; }
   body.dark .btn-secondary{ background:rgba(255,255,255,0.12); color:#f2f2f5; }
   body.dark .tabbar button{ background:rgba(255,255,255,0.1); color:#f2f2f5; }
   body.dark .desk{ box-shadow:0 2px 10px rgba(0,0,0,0.35); }
@@ -227,8 +239,11 @@
 <div id="editHint">빈 공간을 탭해 책상 추가 · 책상을 드래그해서 이동(자동 정렬) · ✕로 삭제 · 좌우/아래로 스크롤하면 더 많은 자리를 배치할 수 있어요</div>
 
 <main>
+  <div class="fit-toggle"><button id="fitToggleBtn" class="active">화면에 맞춤</button></div>
   <div class="canvas-scroll glass" id="canvasScroll">
-    <div id="deskCanvas" class="canvas"></div>
+    <div id="canvasViewport">
+      <div id="deskCanvas" class="canvas"></div>
+    </div>
   </div>
 </main>
 
@@ -245,6 +260,9 @@
     <button class="fab-item" data-action="layout">좌석 배치 모드</button>
     <button class="fab-item" data-action="rules">규정 관리</button>
     <button class="fab-item" data-action="ranking">랭킹</button>
+    <button class="fab-item" data-action="stats">통계</button>
+    <button class="fab-item" data-action="diary">감독일지</button>
+    <button class="fab-item" data-action="log">변경 이력</button>
     <button class="fab-item" data-action="device">기기 연결</button>
     <button class="fab-item" data-action="backup">백업 / 복원</button>
     <button class="fab-item" data-action="password">비밀번호 변경</button>
@@ -258,6 +276,7 @@
   <div class="modal glass">
     <button class="close-x" data-close="ovPassword">✕</button>
     <h2>관리자 인증</h2>
+    <div class="field"><label>관리자 이름 (변경 이력에 기록됩니다)</label><input type="text" id="pwAdminName" placeholder="예: 김선생"></div>
     <div class="field"><label>비밀번호</label><input type="password" id="pwInput" inputmode="numeric"></div>
     <div class="modal-actions"><button class="btn btn-primary" id="pwSubmit" style="width:100%">확인</button></div>
   </div>
@@ -292,6 +311,9 @@
       <button class="tabbtn" data-tab="layout">좌석 배치</button>
       <button class="tabbtn" data-tab="rules">규정 관리</button>
       <button class="tabbtn" data-tab="ranking">랭킹</button>
+      <button class="tabbtn" data-tab="stats">통계</button>
+      <button class="tabbtn" data-tab="diary">감독일지</button>
+      <button class="tabbtn" data-tab="log">변경 이력</button>
       <button class="tabbtn" data-tab="device">기기 연결</button>
       <button class="tabbtn" data-tab="password">비밀번호</button>
       <button class="tabbtn" data-tab="backup">백업/복원</button>
@@ -308,9 +330,7 @@
       </div>
       <div class="field"><label>월 목표시간(분)</label><input id="newGoal" type="number" value="1200"></div>
       <div class="field"><label>자율학습 요일 및 시간</label>
-        <div class="schedule-grid" id="regScheduleGrid">
-          <div></div><div class="muted" style="font-size:11px;">신청</div><div class="muted" style="font-size:11px;">시간</div>
-        </div>
+        <div id="regScheduleGrid"></div>
       </div>
       <button class="btn btn-primary" id="addStudentBtn" style="width:100%">학생 추가</button>
     </div>
@@ -334,6 +354,32 @@
       <h3>이번 달 랭킹</h3>
       <p class="muted">누적 순공부시간 기준입니다. 학생들에게는 공개되지 않고 관리자만 볼 수 있어요.</p>
       <div id="rankingList"></div>
+    </div>
+
+    <div class="tabpane" id="tab-stats">
+      <h3>월간 학습시간 통계</h3>
+      <p class="muted">이번 달 날짜별 전체 학생 누적 순공부시간(분) 추이입니다.</p>
+      <div id="statsChart" style="padding:8px 4px 0;"></div>
+      <div id="statsSummary" class="muted" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="tabpane" id="tab-diary">
+      <h3>일일 야자 감독 일지</h3>
+      <p class="muted">날짜별로 감독 내용을 기록하고, 누가 언제 기록했는지 확인할 수 있습니다.</p>
+      <div class="row">
+        <div class="field"><label>날짜</label><input type="date" id="diaryDate"></div>
+        <div class="field"><label>작성자</label><input type="text" id="diaryAuthor" placeholder="예: 김선생"></div>
+      </div>
+      <div class="field"><label>감독 내용</label><textarea id="diaryContent" rows="4" style="width:100%;padding:11px 12px;border-radius:12px;border:1px solid rgba(120,120,128,0.25);background:rgba(255,255,255,0.7);font-family:inherit;font-size:14px;resize:vertical;" placeholder="특이사항, 지도 내용 등을 기록하세요"></textarea></div>
+      <button class="btn btn-primary" id="saveDiaryBtn" style="width:100%">기록 저장</button>
+      <h3>선택한 날짜의 기록</h3>
+      <div id="diaryList"></div>
+    </div>
+
+    <div class="tabpane" id="tab-log">
+      <h3>관리자 변경 이력</h3>
+      <p class="muted">학생 정보, 좌석 배정, 출결 등을 누가 언제 수정했는지 최신순으로 기록됩니다.</p>
+      <div id="changeLogList"></div>
     </div>
 
     <div class="tabpane" id="tab-device">
@@ -467,7 +513,7 @@
   let db;
   function openDB(){
     return new Promise((resolve,reject) => {
-      const req = indexedDB.open('yaja_db', 2);
+      const req = indexedDB.open('yaja_db', 3);
       req.onupgradeneeded = e => {
         const d = e.target.result;
         if(!d.objectStoreNames.contains('students')) d.createObjectStore('students',{keyPath:'id',autoIncrement:true});
@@ -477,6 +523,11 @@
         }
         if(!d.objectStoreNames.contains('settings')) d.createObjectStore('settings',{keyPath:'key'});
         if(!d.objectStoreNames.contains('desks')) d.createObjectStore('desks',{keyPath:'id',autoIncrement:true});
+        if(!d.objectStoreNames.contains('changelog')) d.createObjectStore('changelog',{keyPath:'id',autoIncrement:true});
+        if(!d.objectStoreNames.contains('dailylogs')){
+          const s2 = d.createObjectStore('dailylogs',{keyPath:'id',autoIncrement:true});
+          s2.createIndex('date','date',{unique:false});
+        }
       };
       req.onsuccess = e => resolve(e.target.result);
       req.onerror = e => reject(e);
@@ -489,32 +540,79 @@
   function dbDelete(store,key){ return new Promise((res,rej)=>{ const r = tx(store,'readwrite').delete(key); r.onsuccess=()=>res(); r.onerror=()=>rej(r.error); }); }
   function dbClear(store){ return new Promise((res,rej)=>{ const r = tx(store,'readwrite').clear(); r.onsuccess=()=>res(); r.onerror=()=>rej(r.error); }); }
   function dbIndexGet(store,index,value){ return new Promise((res,rej)=>{ const r = tx(store,'readonly').index(index).get(value); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+  function dbIndexGetAll(store,index,value){ return new Promise((res,rej)=>{ const r = tx(store,'readonly').index(index).getAll(value); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
 
   /* ---------------- 상태 ---------------- */
   let settings, students = [], desks = [];
   let adminMode = false, adminIdleTimer = null;
   let currentFloor = 1;
   let layoutEditMode = false, newDeskType = 'open';
+  let fitToScreen = true;
   let longPressTimer = null, longPressTriggered = false;
   let serialPort = null, serialWriter = null, serialBuffer = '';
+  let adminName = '';
+
+  /* ---------------- 관리자 변경 이력 로그 ---------------- */
+  async function logChange(action, detail){
+    try{ await dbPut('changelog', { timestamp: Date.now(), admin: adminName || '관리자', action, detail: detail||'' }); }
+    catch(e){ /* 로그 실패는 무시 */ }
+  }
 
   function defaultWeekly(){ const w={}; DAYS.forEach(([k])=>w[k]={enabled:false,start:'18:00',end:'21:00'}); return w; }
 
+  /* ---------------- 시간 선택 UI (select 기반, 태블릿/웹뷰에서도 항상 값이 확실히 기록되도록) ----------------
+     일부 태블릿/웹뷰 환경에서는 <input type="time">이 정상 동작하지 않거나(값이 비어있거나 반영이 안 됨)
+     화면에 오후/오전 표기만 나오고 실제 값이 저장되지 않는 문제가 있어, 신뢰성이 높은 select 방식으로 대체.
+     시/분을 하나의 select로 합쳐 작은 화면에서도 한 줄에 들어가도록 함 */
+  function timeLabel(h,m){
+    const ampm = h<12 ? '오전' : '오후';
+    const h12 = h%12===0 ? 12 : h%12;
+    return `${ampm} ${h12}:${String(m).padStart(2,'0')}`;
+  }
+  function timeSelectHTML(prefix, value){
+    let [vh,vm] = (value||'18:00').split(':').map(Number);
+    if(isNaN(vh)) vh=18; if(isNaN(vm)) vm=0;
+    vm = Math.round(vm/10)*10; if(vm===60){ vm=0; vh=(vh+1)%24; }
+    let opts = '';
+    for(let mins=0; mins<24*60; mins+=10){
+      const h = Math.floor(mins/60), m = mins%60;
+      const val = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+      const selected = (h===vh && m===vm) ? 'selected' : '';
+      opts += `<option value="${val}" ${selected}>${timeLabel(h,m)}</option>`;
+    }
+    return `<select class="timeSel" data-prefix="${prefix}">${opts}</select>`;
+  }
+  function getTimeSelectValue(prefix){
+    const el = document.querySelector(`.timeSel[data-prefix="${prefix}"]`);
+    return el ? el.value : '18:00';
+  }
+  function setTimeSelectValue(prefix, value){
+    const el = document.querySelector(`.timeSel[data-prefix="${prefix}"]`);
+    if(el) el.value = value||'18:00';
+  }
+
   function buildRegScheduleGrid(){
     const grid = $('#regScheduleGrid');
+    grid.innerHTML = '';
     DAYS.forEach(([key,label]) => {
-      const dayEl = document.createElement('div'); dayEl.className = 'day'; dayEl.textContent = label;
-      const cbWrap = document.createElement('div');
-      cbWrap.innerHTML = `<input type="checkbox" class="regDay" data-day="${key}">`;
-      const timeWrap = document.createElement('div');
-      timeWrap.innerHTML = `<input type="time" class="regStart" data-day="${key}" value="18:00" style="width:70px;display:inline-block;padding:4px;"> ~ <input type="time" class="regEnd" data-day="${key}" value="21:00" style="width:70px;display:inline-block;padding:4px;">`;
-      grid.appendChild(dayEl); grid.appendChild(cbWrap); grid.appendChild(timeWrap);
+      const row = document.createElement('div'); row.className = 'day-sched-row';
+      row.innerHTML = `
+        <div class="day-sched-head">
+          <label class="day-toggle"><input type="checkbox" class="regDay" data-day="${key}"><span>${label}요일</span></label>
+        </div>
+        <div class="day-sched-time" data-day="${key}" style="display:none;">
+          ${timeSelectHTML('reg_'+key+'_s', '18:00')}<span class="tilde">~</span>${timeSelectHTML('reg_'+key+'_e', '21:00')}
+        </div>`;
+      grid.appendChild(row);
+      const cb = row.querySelector('.regDay');
+      const timeRow = row.querySelector('.day-sched-time');
+      cb.addEventListener('change', () => { timeRow.style.display = cb.checked ? 'flex' : 'none'; });
     });
   }
   function resetRegScheduleGrid(){
-    $$('.regDay').forEach(cb => cb.checked = false);
-    $$('.regStart').forEach(inp => inp.value = '18:00');
-    $$('.regEnd').forEach(inp => inp.value = '21:00');
+    $$('#regScheduleGrid .regDay').forEach(cb => { cb.checked = false; });
+    $$('#regScheduleGrid .day-sched-time').forEach(el => el.style.display = 'none');
+    DAYS.forEach(([key]) => { setTimeSelectValue('reg_'+key+'_s','18:00'); setTimeSelectValue('reg_'+key+'_e','21:00'); });
   }
 
   async function loadSettings(){
@@ -628,16 +726,21 @@
   /* ---------------- 좌석 배치 모드 ---------------- */
   async function addDesk(floor,type,col,row){
     await dbPut('desks', { floor, type, col, row });
-    await loadDesks(); renderFloor();
+    await loadDesks();
+    await logChange('좌석 추가', `${floor}층 ${type==='partition'?'칸막이':'오픈형'}`);
+    renderFloor();
   }
   async function deleteDesk(id){
     const desk = findDesk(id);
+    const label = desk ? deskLabel(desk) : ('ID '+id);
     if(desk){
       const st = findStudentByDesk(id);
       if(st){ st.deskId = null; await dbPut('students', st); await loadStudents(); }
     }
     await dbDelete('desks', id);
-    await loadDesks(); renderFloor();
+    await loadDesks();
+    await logChange('좌석 삭제', label);
+    renderFloor();
   }
 
   $$('input[name="deskType"]').forEach(r => r.addEventListener('change', e => { newDeskType = e.target.value; }));
@@ -662,8 +765,22 @@
   }
   $$('.floor-tab').forEach(b => b.addEventListener('click', () => selectFloor(parseInt(b.dataset.floor))));
 
-  async function renderFloor(){
+  $('#fitToggleBtn').addEventListener('click', () => {
+    fitToScreen = !fitToScreen;
+    $('#fitToggleBtn').classList.toggle('active', fitToScreen);
+    $('#fitToggleBtn').textContent = fitToScreen ? '화면에 맞춤' : '실제 크기';
+    renderFloor();
+  });
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { if(!layoutEditMode) renderFloor(); }, 200);
+  });
+
+  async function renderFloor(opts){
+    opts = opts || {};
     const canvas = $('#deskCanvas');
+    const viewport = $('#canvasViewport');
     const scrollWrap = $('#canvasScroll');
     scrollWrap.classList.toggle('editing', layoutEditMode);
     $('#editHint').style.display = layoutEditMode ? 'block' : 'none';
@@ -718,6 +835,7 @@
         const pct = Math.min(100, Math.round(monthlyTotalMin/goal*100));
         cell.innerHTML = `
           <span class="badge">${desk.type==='partition'?'칸막이':'오픈형'}</span>
+          ${pct>=100?'<span class="goal-badge" title="이번 달 목표 달성!">⭐</span>':''}
           <div class="d-name">${student.name}</div>
           <div class="d-time">${checkIn}~${checkOut}<br>${elapsedMin}분</div>
           <div class="goal-bar"><div class="goal-fill" style="width:${pct}%"></div></div>`;
@@ -731,6 +849,33 @@
       else attachDeskEvents(cell, desk);
       canvas.appendChild(cell);
     }
+
+    /* ---- 작은 화면 자동 맞춤: 사용 중인 좌석 범위만 계산해 컨테이너 너비에 맞게 축소 ---- */
+    const useFit = fitToScreen && !layoutEditMode && !opts.fullView;
+    if(useFit){
+      const margin = 1;
+      let minCol=GRID_COLS-1, maxCol=0, minRow=GRID_ROWS-1, maxRow=0;
+      if(floorDesks.length){
+        floorDesks.forEach(d => { minCol=Math.min(minCol,d.col); maxCol=Math.max(maxCol,d.col); minRow=Math.min(minRow,d.row); maxRow=Math.max(maxRow,d.row); });
+      } else { minCol=0; maxCol=3; minRow=0; maxRow=2; }
+      const bMinC = Math.max(0, minCol-margin), bMaxC = Math.min(GRID_COLS-1, maxCol+margin);
+      const bMinR = Math.max(0, minRow-margin), bMaxR = Math.min(GRID_ROWS-1, maxRow+margin);
+      const boundedW = (bMaxC-bMinC+1)*CELL_W + CELL_PAD*2;
+      const boundedH = (bMaxR-bMinR+1)*CELL_H + CELL_PAD*2;
+      const availW = scrollWrap.clientWidth - 4;
+      let scale = availW > 0 ? Math.min(1, availW/boundedW) : 1;
+      scale = Math.max(scale, 0.4);
+      viewport.style.width = Math.round(boundedW*scale)+'px';
+      viewport.style.height = Math.round(boundedH*scale)+'px';
+      canvas.style.transformOrigin = '0 0';
+      canvas.style.transform = `scale(${scale}) translate(${-bMinC*CELL_W}px, ${-bMinR*CELL_H}px)`;
+    } else {
+      viewport.style.width = size.width+'px';
+      viewport.style.height = size.height+'px';
+      canvas.style.transformOrigin = '0 0';
+      canvas.style.transform = 'none';
+    }
+
     $('#floorSummary').textContent = `재실 ${presentCount} / 전체 ${floorDesks.length}`;
     renderTodaySummary();
   }
@@ -816,6 +961,85 @@
       </div>`).join('');
   }
 
+  /* ---------------- 월간 통계 그래프 ---------------- */
+  async function computeDailyTotals(){
+    const attendance = await dbGetAll('attendance');
+    const mPrefix = monthStr();
+    const totals = {}; // date -> minutes
+    attendance.filter(a => a.date && a.date.startsWith(mPrefix)).forEach(a => {
+      let secs = a.elapsedSeconds || 0;
+      if(a.status !== 'left' && a.checkIn) secs = Math.max(secs, Math.round((Date.now()-a.checkIn)/1000));
+      totals[a.date] = (totals[a.date]||0) + Math.round(secs/60);
+    });
+    return totals;
+  }
+  async function renderStatsChart(){
+    const totals = await computeDailyTotals();
+    const now = new Date();
+    const daysInMonth = now.getDate();
+    const bars = [];
+    for(let d=1; d<=daysInMonth; d++){
+      const dateStr = monthStr()+'-'+String(d).padStart(2,'0');
+      bars.push({ day:d, min: totals[dateStr]||0 });
+    }
+    const maxMin = Math.max(1, ...bars.map(b=>b.min));
+    const chart = $('#statsChart');
+    chart.innerHTML = `<div style="display:flex;align-items:flex-end;gap:3px;height:160px;overflow-x:auto;padding-bottom:4px;">` +
+      bars.map(b => `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:18px;flex:1;">
+          <div title="${b.day}일: ${b.min}분" style="width:100%;max-width:22px;background:var(--accent);border-radius:4px 4px 0 0;height:${Math.max(2,Math.round(b.min/maxMin*130))}px;"></div>
+          <div style="font-size:9px;color:var(--text-secondary);margin-top:3px;">${b.day}</div>
+        </div>`).join('') + `</div>`;
+    const totalMin = bars.reduce((s,b)=>s+b.min,0);
+    const avgMin = Math.round(totalMin/daysInMonth);
+    $('#statsSummary').textContent = `이번 달 전체 누적 ${Math.floor(totalMin/60)}시간 ${totalMin%60}분 · 일평균 ${avgMin}분`;
+  }
+
+  /* ---------------- 일일 야자 감독 일지 ---------------- */
+  async function renderDiaryList(){
+    const date = $('#diaryDate').value || todayStr();
+    let entries = [];
+    try{ entries = await dbIndexGetAll('dailylogs','date',date); }catch(e){ entries = (await dbGetAll('dailylogs')).filter(e=>e.date===date); }
+    entries.sort((a,b)=>b.timestamp-a.timestamp);
+    const list = $('#diaryList');
+    if(entries.length===0){ list.innerHTML = '<p class="muted">해당 날짜에 기록된 감독 일지가 없습니다.</p>'; return; }
+    list.innerHTML = entries.map(e => `
+      <div class="list-item" style="flex-direction:column;align-items:flex-start;gap:4px;">
+        <div style="display:flex;justify-content:space-between;width:100%;">
+          <b>${e.author||'익명'}</b>
+          <span class="muted">${new Date(e.timestamp).toLocaleString('ko-KR',{hour:'2-digit',minute:'2-digit',month:'numeric',day:'numeric'})} 기록</span>
+        </div>
+        <div style="white-space:pre-wrap;">${e.content}</div>
+      </div>`).join('');
+  }
+  $('#diaryDate').addEventListener('change', renderDiaryList);
+  $('#saveDiaryBtn').addEventListener('click', async () => {
+    const date = $('#diaryDate').value || todayStr();
+    const author = $('#diaryAuthor').value.trim() || adminName || '익명';
+    const content = $('#diaryContent').value.trim();
+    if(!content){ await showMessage('감독 내용을 입력해주세요.'); return; }
+    await dbPut('dailylogs', { date, author, content, timestamp: Date.now() });
+    await logChange('감독일지 작성', `${date} (${author})`);
+    $('#diaryContent').value = '';
+    await renderDiaryList();
+    await showMessage('감독 일지가 저장되었습니다.');
+  });
+
+  /* ---------------- 관리자 변경 이력 ---------------- */
+  async function renderChangeLog(){
+    const logs = (await dbGetAll('changelog')).sort((a,b)=>b.timestamp-a.timestamp).slice(0,200);
+    const list = $('#changeLogList');
+    if(logs.length===0){ list.innerHTML = '<p class="muted">기록된 변경 이력이 없습니다.</p>'; return; }
+    list.innerHTML = logs.map(l => `
+      <div class="list-item" style="flex-direction:column;align-items:flex-start;gap:2px;">
+        <div style="display:flex;justify-content:space-between;width:100%;">
+          <b>${l.action}</b>
+          <span class="muted">${new Date(l.timestamp).toLocaleString('ko-KR',{hour:'2-digit',minute:'2-digit',month:'numeric',day:'numeric'})}</span>
+        </div>
+        <div class="muted">${l.admin} · ${l.detail||''}</div>
+      </div>`).join('');
+  }
+
   /* ---------------- 오늘 신청 현황 / 지각 판정 ---------------- */
   function isScheduledToday(student){
     const d = student.weeklySchedule[todayDayKey()];
@@ -833,7 +1057,8 @@
   /* ---------------- 좌석표 이미지 저장 ---------------- */
   $('#exportSeatImageBtn').addEventListener('click', async () => {
     const wasEditing = layoutEditMode;
-    if(wasEditing){ layoutEditMode = false; await renderFloor(); }
+    if(wasEditing){ layoutEditMode = false; }
+    await renderFloor({fullView:true});
     try{
       const shot = await html2canvas($('#deskCanvas'), { backgroundColor:'#ffffff' });
       const link = document.createElement('a');
@@ -841,7 +1066,8 @@
       link.href = shot.toDataURL('image/png');
       link.click();
     }catch(e){ await showMessage('이미지 저장 실패: '+e.message); }
-    if(wasEditing){ layoutEditMode = true; await renderFloor(); }
+    layoutEditMode = wasEditing;
+    await renderFloor();
   });
 
   /* ---------------- 학생 검색 ---------------- */
@@ -892,7 +1118,9 @@
         $('#assignBtn').onclick = async () => {
           const sid = parseInt($('#assignSelect').value); if(!sid) return;
           const st = students.find(s=>s.id===sid); st.deskId = deskId;
-          await dbPut('students', st); await loadStudents(); renderFloor(); closeOverlay('ovSeatDetail');
+          await dbPut('students', st); await loadStudents();
+          await logChange('좌석 배정', `${st.name} → ${deskLabel(desk)}`);
+          renderFloor(); closeOverlay('ovSeatDetail');
         };
       } else { body.innerHTML = '<p class="muted">배정된 학생이 없습니다.</p>'; }
     } else {
@@ -910,10 +1138,10 @@
       }
       body.innerHTML = html;
       if(adminMode){
-        $('#setAway').onclick = async () => { await setSeatStatus(student.id,'away'); closeOverlay('ovSeatDetail'); };
-        $('#setPresent').onclick = async () => { await setSeatStatus(student.id,'present'); closeOverlay('ovSeatDetail'); };
-        $('#setLeft').onclick = async () => { await setSeatStatus(student.id,'left'); closeOverlay('ovSeatDetail'); };
-        $('#unassignBtn').onclick = async () => { student.deskId = null; await dbPut('students', student); await loadStudents(); renderFloor(); closeOverlay('ovSeatDetail'); };
+        $('#setAway').onclick = async () => { await setSeatStatus(student.id,'away'); await logChange('출결 수동변경', `${student.name} → 자리비움`); closeOverlay('ovSeatDetail'); };
+        $('#setPresent').onclick = async () => { await setSeatStatus(student.id,'present'); await logChange('출결 수동변경', `${student.name} → 재실`); closeOverlay('ovSeatDetail'); };
+        $('#setLeft').onclick = async () => { await setSeatStatus(student.id,'left'); await logChange('출결 수동변경', `${student.name} → 퇴실`); closeOverlay('ovSeatDetail'); };
+        $('#unassignBtn').onclick = async () => { student.deskId = null; await dbPut('students', student); await loadStudents(); await logChange('좌석 비우기', student.name); renderFloor(); closeOverlay('ovSeatDetail'); };
       }
     }
     openOverlay('ovSeatDetail');
@@ -926,22 +1154,45 @@
     if(!student) return;
     $('#wkTitle').textContent = student.name + '님의 주간 시간표';
     const editable = adminMode;
-    let rows = `<div class="schedule-grid"><div></div><div class="muted">신청 여부</div><div class="muted">시간대</div>`;
+    let rows = '';
     DAYS.forEach(([key,label]) => {
       const d = student.weeklySchedule[key] || {enabled:false,start:'18:00',end:'21:00'};
-      rows += `<div class="day">${label}</div>
-        <div>${editable ? `<input type="checkbox" id="wd_${key}" ${d.enabled?'checked':''}>` : (d.enabled?'신청':'미신청')}</div>
-        <div>${editable
-          ? `<input type="time" id="ws_${key}" value="${d.start}" style="width:70px;display:inline-block;padding:4px;"> ~ <input type="time" id="we_${key}" value="${d.end}" style="width:70px;display:inline-block;padding:4px;">`
-          : (d.enabled ? d.start+' ~ '+d.end : '-')}</div>`;
+      if(editable){
+        rows += `
+          <div class="day-sched-row">
+            <div class="day-sched-head">
+              <label class="day-toggle"><input type="checkbox" id="wd_${key}" ${d.enabled?'checked':''}><span>${label}요일</span></label>
+            </div>
+            <div class="day-sched-time" data-day="${key}" style="display:${d.enabled?'flex':'none'};">
+              ${timeSelectHTML('wk_'+key+'_s', d.start)}<span class="tilde">~</span>${timeSelectHTML('wk_'+key+'_e', d.end)}
+            </div>
+          </div>`;
+      } else {
+        rows += `
+          <div class="day-sched-row">
+            <div class="day-sched-head">
+              <span style="font-weight:600;">${label}요일</span>
+              <span class="muted">${d.enabled?'신청':'미신청'}</span>
+            </div>
+            ${d.enabled ? `<div class="muted" style="margin-top:4px;font-size:13px;">${timeLabel(...d.start.split(':').map(Number))} ~ ${timeLabel(...d.end.split(':').map(Number))}</div>` : ''}
+          </div>`;
+      }
     });
-    rows += '</div>';
     $('#wkBody').innerHTML = rows;
+    if(editable){
+      DAYS.forEach(([key]) => {
+        const cb = $('#wd_'+key);
+        const timeRow = document.querySelector(`.day-sched-time[data-day="${key}"]`);
+        cb.addEventListener('change', () => { timeRow.style.display = cb.checked ? 'flex' : 'none'; });
+      });
+    }
     $('#wkActions').innerHTML = editable ? `<button class="btn btn-primary" id="wkSave" style="width:100%">저장</button>` : '';
     if(editable){
       $('#wkSave').onclick = async () => {
-        DAYS.forEach(([key]) => { student.weeklySchedule[key] = { enabled: $('#wd_'+key).checked, start: $('#ws_'+key).value, end: $('#we_'+key).value }; });
-        await dbPut('students', student); await loadStudents(); closeOverlay('ovWeekly');
+        DAYS.forEach(([key]) => { student.weeklySchedule[key] = { enabled: $('#wd_'+key).checked, start: getTimeSelectValue('wk_'+key+'_s'), end: getTimeSelectValue('wk_'+key+'_e') }; });
+        await dbPut('students', student); await loadStudents();
+        await logChange('시간표 변경', `${student.name}님 주간 시간표 수정`);
+        closeOverlay('ovWeekly');
       };
     }
     openOverlay('ovWeekly');
@@ -971,16 +1222,21 @@
     if(tab==='students'){ renderAdminStudentList(); renderDeskOptions(); }
     if(tab==='rules'){ $('#rulesTextarea').value = settings.rulesText || ''; }
     if(tab==='ranking'){ renderRanking(); }
+    if(tab==='stats'){ renderStatsChart(); }
+    if(tab==='diary'){ if(!$('#diaryDate').value) $('#diaryDate').value = todayStr(); renderDiaryList(); }
+    if(tab==='log'){ renderChangeLog(); }
     openOverlay('ovAdmin');
   }
 
   $('#btnAdmin').addEventListener('click', () => {
     if(adminMode){ openAdminPanel('students'); }
-    else { $('#pwInput').value=''; openOverlay('ovPassword'); }
+    else { $('#pwInput').value=''; $('#pwAdminName').value = settings.lastAdminName || ''; openOverlay('ovPassword'); }
   });
   $('#pwSubmit').addEventListener('click', async () => {
     if($('#pwInput').value === settings.adminPassword){
       adminMode = true;
+      adminName = $('#pwAdminName').value.trim() || '관리자';
+      settings.lastAdminName = adminName; await saveSettings();
       $('#btnAdmin').textContent = '관리자 메뉴';
       $('#adminFab').style.display = 'flex';
       resetAdminIdleTimer();
@@ -1048,7 +1304,10 @@
     $$('#studentList [data-del]').forEach(b => {
       b.onclick = async () => {
         if(await showConfirm('정말 삭제하시겠습니까?')){
-          await dbDelete('students', parseInt(b.dataset.del));
+          const sid = parseInt(b.dataset.del);
+          const st = students.find(s=>s.id===sid);
+          await dbDelete('students', sid);
+          await logChange('학생 삭제', st?st.name:('ID '+sid));
           await loadStudents(); renderAdminStudentList(); renderDeskOptions(); renderFloor();
         }
       };
@@ -1064,12 +1323,11 @@
     const weeklySchedule = defaultWeekly();
     DAYS.forEach(([key]) => {
       const cb = document.querySelector(`.regDay[data-day="${key}"]`);
-      const st = document.querySelector(`.regStart[data-day="${key}"]`);
-      const et = document.querySelector(`.regEnd[data-day="${key}"]`);
-      weeklySchedule[key] = { enabled: cb.checked, start: st.value || '18:00', end: et.value || '21:00' };
+      weeklySchedule[key] = { enabled: cb.checked, start: getTimeSelectValue('reg_'+key+'_s'), end: getTimeSelectValue('reg_'+key+'_e') };
     });
     await dbPut('students', { name, deskId, fingerprintId: fp, weeklySchedule, monthlyGoalMinutes: goal, monthlyElapsedSeconds:0, monthlyHistory:{} });
     await loadStudents();
+    await logChange('학생 등록', `${name} (지문ID ${fp}${deskId!=null?', '+deskLabel(findDesk(deskId)):''})`);
     $('#newName').value=''; $('#newFp').value=''; $('#newGoal').value=1200;
     resetRegScheduleGrid();
     renderAdminStudentList(); renderDeskOptions(); renderFloor();
@@ -1145,7 +1403,9 @@
   });
   $('#exportJsonBtn').addEventListener('click', async () => {
     const attendance = await dbGetAll('attendance');
-    const data = { students, desks, attendance, settings, exportedAt: new Date().toISOString() };
+    const changelog = await dbGetAll('changelog');
+    const dailylogs = await dbGetAll('dailylogs');
+    const data = { students, desks, attendance, settings, changelog, dailylogs, exportedAt: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'yaja_backup_'+todayStr()+'.json'; a.click();
   });
@@ -1154,12 +1414,15 @@
     if(!(await showConfirm('현재 데이터를 모두 덮어씁니다. 계속하시겠습니까?'))) return;
     try{
       const data = JSON.parse(await file.text());
-      await dbClear('students'); await dbClear('attendance'); await dbClear('desks');
+      await dbClear('students'); await dbClear('attendance'); await dbClear('desks'); await dbClear('changelog'); await dbClear('dailylogs');
       for(const s of data.students){ await dbPut('students', s); }
       for(const a of data.attendance){ await dbPut('attendance', a); }
       for(const d of (data.desks||[])){ await dbPut('desks', d); }
+      for(const c of (data.changelog||[])){ await dbPut('changelog', c); }
+      for(const dl of (data.dailylogs||[])){ await dbPut('dailylogs', dl); }
       if(data.settings){ settings = { ...settings, ...data.settings }; await saveSettings(); }
       await loadStudents(); await loadDesks(); renderFloor();
+      await logChange('데이터 복원', 'JSON 백업 파일로부터 복원됨');
       await showMessage('복원이 완료되었습니다.');
     }catch(err){ await showMessage('복원 실패: 올바른 JSON 백업 파일이 아닙니다.'); }
   });
