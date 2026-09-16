@@ -321,11 +321,31 @@
 
     <div class="tabpane active" id="tab-students">
       <h3>학생 목록</h3>
+      <div class="row">
+        <div class="field"><label>정렬</label><select id="studentSort">
+          <option value="name">이름순</option>
+          <option value="seat">좌석 배정 여부</option>
+          <option value="seatMode">좌석 유형</option>
+        </select></div>
+        <div class="field"><label>필터</label><select id="studentFilter">
+          <option value="all">전체</option>
+          <option value="assigned">좌석 배정됨</option>
+          <option value="unassigned">좌석 미배정</option>
+          <option value="fixed">고정좌석</option>
+          <option value="flexible">자율</option>
+        </select></div>
+      </div>
       <div id="studentList"></div>
       <h3>새 학생 등록</h3>
       <div class="field"><label>이름</label><input id="newName"></div>
+      <div class="field"><label>좌석 유형</label>
+        <div class="row">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="newSeatMode" value="fixed" checked> 고정좌석(2층)</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="newSeatMode" value="flexible"> 자율(매일 자동배정)</label>
+        </div>
+      </div>
       <div class="row">
-        <div class="field"><label>좌석</label><select id="newSeat"></select></div>
+        <div class="field" id="newSeatField"><label>좌석 (고정좌석만 해당)</label><select id="newSeat"></select></div>
         <div class="field"><label>지문 ID</label><input id="newFp" type="number" min="1" max="199"></div>
       </div>
       <div class="field"><label>월 목표시간(분)</label><input id="newGoal" type="number" value="1200"></div>
@@ -333,6 +353,11 @@
         <div id="regScheduleGrid"></div>
       </div>
       <button class="btn btn-primary" id="addStudentBtn" style="width:100%">학생 추가</button>
+
+      <h3>학생 일괄 등록 (엑셀)</h3>
+      <p class="muted">양식을 내려받아 작성한 뒤 업로드하세요. 요일 칸은 "18:00-21:00" 형식으로 입력하고, 신청하지 않는 요일은 비워두세요. 좌석유형은 "고정" 또는 "자율"로 입력합니다. (고정좌석의 실제 좌석 배정은 등록 후 학생 목록에서 별도로 진행해주세요.)</p>
+      <button class="btn btn-secondary" id="downloadTemplateBtn" style="width:100%;">등록 양식 다운로드</button>
+      <input type="file" id="importStudentsFile" accept=".xlsx,.xls" style="margin-top:8px;width:100%;">
     </div>
 
     <div class="tabpane" id="tab-rules">
@@ -361,6 +386,8 @@
       <p class="muted">이번 달 날짜별 전체 학생 누적 순공부시간(분) 추이입니다.</p>
       <div id="statsChart" style="padding:8px 4px 0;"></div>
       <div id="statsSummary" class="muted" style="margin-top:10px;"></div>
+      <h3>학생별 지각 · 결석 통계 (이번 달)</h3>
+      <div id="lateAbsenceList"></div>
     </div>
 
     <div class="tabpane" id="tab-diary">
@@ -466,6 +493,66 @@
   </div>
 </div>
 
+<!-- 좌석 선택 (자율 학생 입실 시) -->
+<div class="overlay" id="ovSeatChoice">
+  <div class="modal glass">
+    <h2>오늘 학습 방식을 선택해주세요</h2>
+    <p class="muted" id="scDesc">전체 시간(4시~9시30분)을 채울 예정이면 "전체 시간", 자유롭게 왔다 갈 예정이면 "일부 시간"을 선택해주세요.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="scPartial" style="flex:1;">일부 시간 (1층)</button>
+      <button class="btn btn-primary" id="scFull" style="flex:1;">전체 시간 (2층)</button>
+    </div>
+    <button class="btn btn-secondary" id="scCancel" style="width:100%;margin-top:8px;">취소</button>
+  </div>
+</div>
+
+<!-- 학생 정보 수정 -->
+<div class="overlay" id="ovStudentEdit">
+  <div class="modal glass">
+    <button class="close-x" data-close="ovStudentEdit">✕</button>
+    <h2>학생 정보 수정</h2>
+    <div class="field"><label>이름</label><input id="editName"></div>
+    <div class="field"><label>좌석 유형</label>
+      <div class="row">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="editSeatMode" value="fixed"> 고정좌석(2층)</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="editSeatMode" value="flexible"> 자율(매일 자동배정)</label>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field" id="editSeatField"><label>좌석 (고정좌석만 해당)</label><select id="editSeat"></select></div>
+      <div class="field"><label>지문 ID</label><input id="editFp" type="number" min="1" max="199"></div>
+    </div>
+    <div class="field"><label>월 목표시간(분)</label><input id="editGoal" type="number"></div>
+    <div class="field"><label>자율학습 요일 및 시간</label>
+      <div id="editScheduleGrid"></div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-primary" id="editSaveBtn" style="width:100%">저장</button></div>
+  </div>
+</div>
+
+<!-- 학생 지문 재등록 -->
+<div class="overlay" id="ovFingerprintEnroll">
+  <div class="modal glass">
+    <button class="close-x" data-close="ovFingerprintEnroll">✕</button>
+    <h2><span id="feName"></span>님 지문 재등록</h2>
+    <p class="muted">지문 인식이 잘 안 될 때 사용하세요. 먼저 관리자 패널 &gt; 기기 연결 탭에서 지문 인식기(아두이노)를 연결한 뒤 진행해주세요.</p>
+    <div class="field"><label>지문 ID (1~199)</label><input id="feFpId" type="number" min="1" max="199"></div>
+    <p class="muted">기존과 같은 ID를 그대로 사용하면 해당 자리에 새로 스캔한 지문으로 덮어씁니다. 다른 번호를 쓰고 싶다면 값을 바꿔주세요.</p>
+    <button class="btn btn-primary" id="feStartBtn" style="width:100%">등록 시작</button>
+    <p id="feStatus" class="muted" style="margin-top:12px;white-space:pre-wrap;"></p>
+  </div>
+</div>
+
+<!-- 학생별 출결 이력 -->
+<div class="overlay" id="ovAttendanceHistory">
+  <div class="modal glass">
+    <button class="close-x" data-close="ovAttendanceHistory">✕</button>
+    <h2 id="histTitle">출결 이력</h2>
+    <div id="histSummary" class="muted" style="margin-bottom:10px;"></div>
+    <div id="histList"></div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
@@ -551,6 +638,7 @@
   let longPressTimer = null, longPressTriggered = false;
   let serialPort = null, serialWriter = null, serialBuffer = '';
   let adminName = '';
+  let pendingEnrollStudentId = null, pendingEnrollFpId = null;
 
   /* ---------------- 관리자 변경 이력 로그 ---------------- */
   async function logChange(action, detail){
@@ -591,28 +679,48 @@
     if(el) el.value = value||'18:00';
   }
 
-  function buildRegScheduleGrid(){
-    const grid = $('#regScheduleGrid');
+  function buildScheduleGrid(containerId, prefix){
+    const grid = $('#'+containerId);
     grid.innerHTML = '';
     DAYS.forEach(([key,label]) => {
       const row = document.createElement('div'); row.className = 'day-sched-row';
       row.innerHTML = `
         <div class="day-sched-head">
-          <label class="day-toggle"><input type="checkbox" class="regDay" data-day="${key}"><span>${label}요일</span></label>
+          <label class="day-toggle"><input type="checkbox" class="schedDay" data-day="${key}" data-prefix="${prefix}"><span>${label}요일</span></label>
         </div>
-        <div class="day-sched-time" data-day="${key}" style="display:none;">
-          ${timeSelectHTML('reg_'+key+'_s', '18:00')}<span class="tilde">~</span>${timeSelectHTML('reg_'+key+'_e', '21:00')}
+        <div class="day-sched-time" data-day="${key}" data-prefix="${prefix}" style="display:none;">
+          ${timeSelectHTML(prefix+'_'+key+'_s', '18:00')}<span class="tilde">~</span>${timeSelectHTML(prefix+'_'+key+'_e', '21:00')}
         </div>`;
       grid.appendChild(row);
-      const cb = row.querySelector('.regDay');
+      const cb = row.querySelector('.schedDay');
       const timeRow = row.querySelector('.day-sched-time');
       cb.addEventListener('change', () => { timeRow.style.display = cb.checked ? 'flex' : 'none'; });
     });
   }
-  function resetRegScheduleGrid(){
-    $$('#regScheduleGrid .regDay').forEach(cb => { cb.checked = false; });
-    $$('#regScheduleGrid .day-sched-time').forEach(el => el.style.display = 'none');
-    DAYS.forEach(([key]) => { setTimeSelectValue('reg_'+key+'_s','18:00'); setTimeSelectValue('reg_'+key+'_e','21:00'); });
+  function resetScheduleGrid(prefix){
+    $$(`.schedDay[data-prefix="${prefix}"]`).forEach(cb => { cb.checked = false; });
+    $$(`.day-sched-time[data-prefix="${prefix}"]`).forEach(el => el.style.display = 'none');
+    DAYS.forEach(([key]) => { setTimeSelectValue(prefix+'_'+key+'_s','18:00'); setTimeSelectValue(prefix+'_'+key+'_e','21:00'); });
+  }
+  function setScheduleGridValues(prefix, weeklySchedule){
+    DAYS.forEach(([key]) => {
+      const cb = document.querySelector(`.schedDay[data-day="${key}"][data-prefix="${prefix}"]`);
+      const timeRow = document.querySelector(`.day-sched-time[data-day="${key}"][data-prefix="${prefix}"]`);
+      const d = (weeklySchedule && weeklySchedule[key]) || {enabled:false,start:'18:00',end:'21:00'};
+      if(!cb || !timeRow) return;
+      cb.checked = d.enabled;
+      timeRow.style.display = d.enabled ? 'flex' : 'none';
+      setTimeSelectValue(prefix+'_'+key+'_s', d.start);
+      setTimeSelectValue(prefix+'_'+key+'_e', d.end);
+    });
+  }
+  function readScheduleGridValues(prefix){
+    const weeklySchedule = {};
+    DAYS.forEach(([key]) => {
+      const cb = document.querySelector(`.schedDay[data-day="${key}"][data-prefix="${prefix}"]`);
+      weeklySchedule[key] = { enabled: cb ? cb.checked : false, start: getTimeSelectValue(prefix+'_'+key+'_s'), end: getTimeSelectValue(prefix+'_'+key+'_e') };
+    });
+    return weeklySchedule;
   }
 
   async function loadSettings(){
@@ -627,6 +735,18 @@
   async function saveSettings(){ await dbPut('settings', settings); }
   async function loadStudents(){ students = await dbGetAll('students'); }
   async function loadDesks(){ desks = await dbGetAll('desks'); }
+  // 이전 버전 데이터 호환: seatMode(고정/자율) 필드가 없으면 기존 좌석 배정 여부로 추론해 채워넣음
+  async function ensureStudentSchema(){
+    let changed = false;
+    for(const s of students){
+      if(s.seatMode === undefined){
+        s.seatMode = s.deskId != null ? 'fixed' : 'flexible';
+        await dbPut('students', s);
+        changed = true;
+      }
+    }
+    if(changed) await loadStudents();
+  }
   function findStudentByDesk(deskId){ return students.find(s => s.deskId === deskId); }
   function findStudentByFp(fpId){ return students.find(s => String(s.fingerprintId) === String(fpId)); }
   function findDesk(id){ return desks.find(d => d.id === id); }
@@ -682,17 +802,72 @@
     return {col,row}; // 격자가 완전히 가득 찬 경우
   }
 
-  /* ---------------- 출결 로직 ---------------- */
+  /* ---------------- 출결 로직 ----------------
+     좌석 유형(seatMode)
+     - fixed(고정좌석, 2층 전용): 학생 레코드의 deskId가 항상 같은 자리를 가리킴. 매일 그 자리에서 기록.
+     - flexible(자율, 1층/2층 유동): 학생 본인 소유의 고정 자리가 없음. 매일 처음 지문을 찍을 때
+       "전체 시간"(2층 빈자리 자동배정) / "일부 시간"(1층 빈자리 순서대로 자동배정)을 선택하고,
+       그 날의 attendance 레코드에만 deskId를 기록한다. 하루가 지나면 새 레코드가 필요하므로
+       1층/2층 유동 배정은 자연스럽게 매일 초기화된다. ---------------- */
   async function getTodayAttendance(studentId){ return await dbIndexGet('attendance','studentDate', studentId+'_'+todayStr()); }
+  async function getTodayRecords(){ return (await dbGetAll('attendance')).filter(a => a.date === todayStr()); }
+  function occupiedDeskIdSet(todayRecords){
+    const set = new Set();
+    students.forEach(s => { if(s.seatMode === 'fixed' && s.deskId != null) set.add(s.deskId); });
+    todayRecords.forEach(r => { if(r.deskId != null) set.add(r.deskId); });
+    return set;
+  }
+  function findAvailableDeskForToday(floor, todayRecords){
+    const occupied = occupiedDeskIdSet(todayRecords);
+    const floorDesks = desks.filter(d => d.floor === floor).sort((a,b) => a.id - b.id);
+    return floorDesks.find(d => !occupied.has(d.id)) || null;
+  }
+  // 특정 책상의 "오늘의 실제 사용자"를 찾음: 고정좌석 학생 우선, 없으면 오늘자 유동배정 기록에서 찾음
+  async function getDeskOccupant(deskId, todayRecords){
+    todayRecords = todayRecords || await getTodayRecords();
+    const fixedStudent = students.find(s => s.seatMode === 'fixed' && s.deskId === deskId);
+    if(fixedStudent){
+      const record = todayRecords.find(r => r.studentId === fixedStudent.id) || null;
+      return { student: fixedStudent, record };
+    }
+    const record = todayRecords.find(r => r.deskId === deskId) || null;
+    if(record){
+      const student = students.find(s => s.id === record.studentId) || null;
+      return { student, record };
+    }
+    return { student: null, record: null };
+  }
+  function showSeatChoice(studentName){
+    return new Promise(resolve => {
+      $('#scDesc').textContent = `${studentName}님, 오늘 학습 방식을 선택해주세요. 4시~9시30분 전체 시간을 채울 예정이면 "전체 시간"(2층), 자유롭게 왔다 갈 예정이면 "일부 시간"(1층)을 선택해주세요.`;
+      openOverlay('ovSeatChoice');
+      $('#scFull').onclick = () => { closeOverlay('ovSeatChoice'); resolve('full'); };
+      $('#scPartial').onclick = () => { closeOverlay('ovSeatChoice'); resolve('partial'); };
+      $('#scCancel').onclick = () => { closeOverlay('ovSeatChoice'); resolve(null); };
+    });
+  }
   async function handleFingerprintMatch(fpId){
     const student = findStudentByFp(fpId);
     if(!student){ logSerial('등록되지 않은 지문 ID: '+fpId); return; }
     let record = await getTodayAttendance(student.id);
     const now = Date.now();
     if(!record){
-      record = { studentId: student.id, studentDate: student.id+'_'+todayStr(), date: todayStr(), checkIn: now, checkOut:null, status:'present', elapsedSeconds:0 };
+      let deskId = null, seatChoice = null;
+      if(student.seatMode === 'fixed'){
+        deskId = student.deskId != null ? student.deskId : null;
+      } else {
+        const choice = await showSeatChoice(student.name);
+        if(choice === null){ logSerial(student.name + '님 입실이 취소되었습니다.'); return; }
+        seatChoice = choice;
+        const todayRecords = await getTodayRecords();
+        const targetFloor = choice === 'full' ? 2 : 1;
+        const desk = findAvailableDeskForToday(targetFloor, todayRecords);
+        deskId = desk ? desk.id : null;
+        if(!desk) logSerial(`${targetFloor}층에 빈자리가 없어 좌석 없이 입실 처리됩니다.`);
+      }
+      record = { studentId: student.id, studentDate: student.id+'_'+todayStr(), date: todayStr(), checkIn: now, checkOut:null, status:'present', elapsedSeconds:0, deskId, seatChoice };
       await dbPut('attendance', record);
-      logSerial(student.name + ' 입실 처리 (' + fmtTime(now) + ')');
+      logSerial(student.name + ' 입실 처리 (' + fmtTime(now) + ')' + (deskId!=null ? ' · ' + deskLabel(findDesk(deskId)) : ''));
     } else if(record.status === 'present' || record.status === 'away'){
       record.checkOut = now; record.status = 'left';
       record.elapsedSeconds = Math.round((now - record.checkIn)/1000);
@@ -802,15 +977,17 @@
     const floorDesks = desks.filter(d => d.floor === currentFloor);
     let presentCount = 0;
     const todayKey = todayDayKey();
+    const todayRecords = await getTodayRecords();
     for(const desk of floorDesks){
-      const student = findStudentByDesk(desk.id);
+      const occ = await getDeskOccupant(desk.id, todayRecords);
+      const student = occ.student;
       const cell = document.createElement('div');
       let status = 'empty';
       let record = null;
       let isLate = false;
       let expectedNotArrived = false;
       if(student){
-        record = await getTodayAttendance(student.id);
+        record = occ.record;
         status = record ? record.status : 'empty';
         if(status === 'present') presentCount++;
         const todaySchedule = student.weeklySchedule[todayKey];
@@ -1071,10 +1248,16 @@
   });
 
   /* ---------------- 학생 검색 ---------------- */
-  function jumpToStudentDesk(student){
+  async function currentDeskForStudent(student, todayRecords){
+    if(student.seatMode === 'fixed') return student.deskId != null ? findDesk(student.deskId) : null;
+    todayRecords = todayRecords || await getTodayRecords();
+    const rec = todayRecords.find(r => r.studentId === student.id);
+    return (rec && rec.deskId != null) ? findDesk(rec.deskId) : null;
+  }
+  async function jumpToStudentDesk(student){
     $('#searchResults').style.display = 'none';
-    if(!student || student.deskId == null) return;
-    const desk = findDesk(student.deskId);
+    if(!student) return;
+    const desk = await currentDeskForStudent(student);
     if(!desk) return;
     if(desk.floor !== currentFloor) selectFloor(desk.floor);
     setTimeout(() => {
@@ -1082,17 +1265,20 @@
       if(el){ el.classList.add('highlight'); el.scrollIntoView({behavior:'smooth', block:'center'}); setTimeout(()=>el.classList.remove('highlight'), 2000); }
     }, 150);
   }
-  $('#studentSearch').addEventListener('input', e => {
+  $('#studentSearch').addEventListener('input', async e => {
     const q = e.target.value.trim().toLowerCase();
     const resultsBox = $('#searchResults');
     if(!q){ resultsBox.style.display = 'none'; return; }
     const matches = students.filter(s => s.name.toLowerCase().includes(q));
     if(matches.length === 0){ resultsBox.style.display = 'none'; return; }
     if(matches.length === 1){ jumpToStudentDesk(matches[0]); return; }
-    resultsBox.innerHTML = matches.map(s => {
-      const desk = s.deskId!=null ? findDesk(s.deskId) : null;
-      return `<div class="search-result-item glass" data-sid="${s.id}">${s.name} · ${desk?deskLabel(desk):'미배정'}</div>`;
-    }).join('');
+    const todayRecords = await getTodayRecords();
+    const rows = [];
+    for(const s of matches){
+      const desk = await currentDeskForStudent(s, todayRecords);
+      rows.push(`<div class="search-result-item glass" data-sid="${s.id}">${s.name} · ${desk?deskLabel(desk):'미배정'}</div>`);
+    }
+    resultsBox.innerHTML = rows.join('');
     resultsBox.style.display = 'block';
     $$('#searchResults [data-sid]').forEach(item => {
       item.addEventListener('click', () => {
@@ -1105,28 +1291,36 @@
   /* ---------------- 좌석 상세 모달 ---------------- */
   async function openSeatDetail(deskId){
     const desk = findDesk(deskId);
-    const student = findStudentByDesk(deskId);
+    const todayRecords = await getTodayRecords();
+    const { student, record } = await getDeskOccupant(deskId, todayRecords);
     $('#sdTitle').textContent = deskLabel(desk);
     const body = $('#sdBody');
     if(!student){
       if(adminMode){
-        const unassigned = students.filter(s => s.deskId == null);
-        body.innerHTML = `<p class="muted">배정된 학생이 없습니다.</p>
-          <div class="field"><label>학생 배정</label><select id="assignSelect"><option value="">선택</option>
-          ${unassigned.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select></div>
-          <button class="btn btn-primary" id="assignBtn" style="width:100%">배정</button>`;
-        $('#assignBtn').onclick = async () => {
-          const sid = parseInt($('#assignSelect').value); if(!sid) return;
-          const st = students.find(s=>s.id===sid); st.deskId = deskId;
-          await dbPut('students', st); await loadStudents();
-          await logChange('좌석 배정', `${st.name} → ${deskLabel(desk)}`);
-          renderFloor(); closeOverlay('ovSeatDetail');
-        };
+        const canAssignFixed = desk.floor === 2;
+        const fixedCandidates = students.filter(s => s.seatMode === 'fixed' && s.deskId == null);
+        body.innerHTML = `<p class="muted">배정된 학생이 없습니다.</p>` +
+          (canAssignFixed
+            ? `<div class="field"><label>고정좌석 학생 배정</label><select id="assignSelect"><option value="">선택</option>
+                ${fixedCandidates.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select></div>
+               <button class="btn btn-primary" id="assignBtn" style="width:100%">배정</button>
+               <p class="muted" style="margin-top:8px;">1층 좌석은 학생이 지문을 등록하면 자동으로 배정됩니다.</p>`
+            : `<p class="muted">1층 좌석은 학생이 지문을 등록하면 자동으로 배정됩니다. (고정좌석은 2층에서만 지정할 수 있습니다)</p>`);
+        if(canAssignFixed){
+          $('#assignBtn').onclick = async () => {
+            const sid = parseInt($('#assignSelect').value); if(!sid) return;
+            const st = students.find(s=>s.id===sid); st.deskId = deskId;
+            await dbPut('students', st); await loadStudents();
+            await logChange('좌석 배정', `${st.name} → ${deskLabel(desk)}`);
+            renderFloor(); closeOverlay('ovSeatDetail');
+          };
+        }
       } else { body.innerHTML = '<p class="muted">배정된 학생이 없습니다.</p>'; }
     } else {
-      const record = await getTodayAttendance(student.id);
       const status = record ? record.status : '미입실';
-      let html = `<p><b>${student.name}</b></p>
+      const modeLabel = student.seatMode === 'fixed' ? '고정좌석'
+        : ('자율 · ' + (record && record.seatChoice === 'full' ? '전체 시간' : record && record.seatChoice === 'partial' ? '일부 시간' : '-'));
+      let html = `<p><b>${student.name}</b> <span class="muted">(${modeLabel})</span></p>
         <p class="muted">오늘 상태: ${statusLabel(status)}</p>
         <p class="muted">입실 ${record?fmtTime(record.checkIn):'-'} / 퇴실 ${record&&record.checkOut?fmtTime(record.checkOut):'-'}</p>`;
       if(adminMode){
@@ -1141,7 +1335,14 @@
         $('#setAway').onclick = async () => { await setSeatStatus(student.id,'away'); await logChange('출결 수동변경', `${student.name} → 자리비움`); closeOverlay('ovSeatDetail'); };
         $('#setPresent').onclick = async () => { await setSeatStatus(student.id,'present'); await logChange('출결 수동변경', `${student.name} → 재실`); closeOverlay('ovSeatDetail'); };
         $('#setLeft').onclick = async () => { await setSeatStatus(student.id,'left'); await logChange('출결 수동변경', `${student.name} → 퇴실`); closeOverlay('ovSeatDetail'); };
-        $('#unassignBtn').onclick = async () => { student.deskId = null; await dbPut('students', student); await loadStudents(); await logChange('좌석 비우기', student.name); renderFloor(); closeOverlay('ovSeatDetail'); };
+        $('#unassignBtn').onclick = async () => {
+          if(student.seatMode === 'fixed'){
+            student.deskId = null; await dbPut('students', student); await loadStudents();
+          } else if(record){
+            record.deskId = null; await dbPut('attendance', record);
+          }
+          await logChange('좌석 비우기', student.name); renderFloor(); closeOverlay('ovSeatDetail');
+        };
       }
     }
     openOverlay('ovSeatDetail');
@@ -1149,8 +1350,8 @@
   function statusLabel(s){ return {present:'재실', away:'자리비움', left:'퇴실', empty:'미입실', '미입실':'미입실'}[s] || s; }
 
   /* ---------------- 주간 시간표 ---------------- */
-  function openWeeklyModal(deskId){
-    const student = findStudentByDesk(deskId);
+  async function openWeeklyModal(deskId){
+    const { student } = await getDeskOccupant(deskId);
     if(!student) return;
     $('#wkTitle').textContent = student.name + '님의 주간 시간표';
     const editable = adminMode;
@@ -1222,7 +1423,7 @@
     if(tab==='students'){ renderAdminStudentList(); renderDeskOptions(); }
     if(tab==='rules'){ $('#rulesTextarea').value = settings.rulesText || ''; }
     if(tab==='ranking'){ renderRanking(); }
-    if(tab==='stats'){ renderStatsChart(); }
+    if(tab==='stats'){ renderStatsChart(); renderLateAbsenceStats(); }
     if(tab==='diary'){ if(!$('#diaryDate').value) $('#diaryDate').value = todayStr(); renderDiaryList(); }
     if(tab==='log'){ renderChangeLog(); }
     openOverlay('ovAdmin');
@@ -1289,17 +1490,45 @@
 
   /* ---- 학생 관리 ---- */
   function renderDeskOptions(){
-    const assignedIds = new Set(students.map(s=>s.deskId).filter(v=>v!=null));
-    const avail = desks.filter(d => !assignedIds.has(d.id));
-    $('#newSeat').innerHTML = '<option value="">미배정</option>' + avail.map(d => `<option value="${d.id}">${deskLabel(d)}</option>`).join('');
+    // 고정좌석은 2층 전용 정책: 2층 중 다른 고정좌석 학생이 쓰지 않는 자리만 노출
+    const assignedIds = new Set(students.filter(s => s.seatMode !== 'flexible' && s.deskId != null).map(s => s.deskId));
+    const avail = desks.filter(d => d.floor === 2 && !assignedIds.has(d.id));
+    $('#newSeat').innerHTML = '<option value="">미배정(추후 배정)</option>' + avail.map(d => `<option value="${d.id}">${deskLabel(d)}</option>`).join('');
   }
+  function toggleNewSeatField(){
+    const modeEl = document.querySelector('input[name="newSeatMode"]:checked');
+    const mode = modeEl ? modeEl.value : 'fixed';
+    $('#newSeatField').style.display = mode === 'fixed' ? 'block' : 'none';
+  }
+  $$('input[name="newSeatMode"]').forEach(r => r.addEventListener('change', () => { toggleNewSeatField(); renderDeskOptions(); }));
   function renderAdminStudentList(){
     const list = $('#studentList');
-    if(students.length===0){ list.innerHTML = '<p class="muted">등록된 학생이 없습니다.</p>'; return; }
-    list.innerHTML = students.map(s => {
+    const sortBy = $('#studentSort') ? $('#studentSort').value : 'name';
+    const filterBy = $('#studentFilter') ? $('#studentFilter').value : 'all';
+    let arr = students.slice();
+    arr = arr.filter(s => {
+      if(filterBy === 'assigned') return s.deskId != null;
+      if(filterBy === 'unassigned') return s.deskId == null;
+      if(filterBy === 'fixed') return s.seatMode === 'fixed';
+      if(filterBy === 'flexible') return s.seatMode !== 'fixed';
+      return true;
+    });
+    if(sortBy === 'name') arr.sort((a,b) => a.name.localeCompare(b.name, 'ko'));
+    else if(sortBy === 'seat') arr.sort((a,b) => (a.deskId!=null?0:1) - (b.deskId!=null?0:1));
+    else if(sortBy === 'seatMode') arr.sort((a,b) => (a.seatMode||'').localeCompare(b.seatMode||''));
+    if(arr.length===0){ list.innerHTML = '<p class="muted">해당 조건의 학생이 없습니다.</p>'; return; }
+    list.innerHTML = arr.map(s => {
       const desk = s.deskId!=null ? findDesk(s.deskId) : null;
-      return `<div class="list-item"><span>${s.name} (${desk?deskLabel(desk):'미배정'} · 지문ID ${s.fingerprintId})</span>
-        <span><button class="btn btn-secondary" data-del="${s.id}">삭제</button></span></div>`;
+      const seatLabel = s.seatMode === 'fixed' ? (desk?deskLabel(desk):'좌석 미지정(고정)') : '자율(당일 자동배정)';
+      return `<div class="list-item" style="flex-direction:column;align-items:stretch;gap:6px;">
+        <div>${s.name} <span class="muted">· ${seatLabel} · 지문ID ${s.fingerprintId}</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <button class="btn btn-secondary" data-edit="${s.id}">수정</button>
+          <button class="btn btn-secondary" data-hist="${s.id}">출결 이력</button>
+          <button class="btn btn-secondary" data-enroll="${s.id}">지문 재등록</button>
+          <button class="btn btn-danger" data-del="${s.id}">삭제</button>
+        </div>
+      </div>`;
     }).join('');
     $$('#studentList [data-del]').forEach(b => {
       b.onclick = async () => {
@@ -1312,26 +1541,200 @@
         }
       };
     });
+    $$('#studentList [data-edit]').forEach(b => { b.onclick = () => openStudentEdit(parseInt(b.dataset.edit)); });
+    $$('#studentList [data-hist]').forEach(b => { b.onclick = () => openAttendanceHistory(parseInt(b.dataset.hist)); });
+    $$('#studentList [data-enroll]').forEach(b => { b.onclick = () => openFingerprintEnroll(parseInt(b.dataset.enroll)); });
   }
+  $('#studentSort') && $('#studentSort').addEventListener('change', renderAdminStudentList);
+  $('#studentFilter') && $('#studentFilter').addEventListener('change', renderAdminStudentList);
   $('#addStudentBtn').addEventListener('click', async () => {
     const name = $('#newName').value.trim();
-    const deskId = $('#newSeat').value === '' ? null : parseInt($('#newSeat').value);
+    const seatModeEl = document.querySelector('input[name="newSeatMode"]:checked');
+    const seatMode = seatModeEl ? seatModeEl.value : 'fixed';
+    const deskId = (seatMode === 'fixed' && $('#newSeat').value !== '') ? parseInt($('#newSeat').value) : null;
     const fp = parseInt($('#newFp').value);
     const goal = parseInt($('#newGoal').value) || 1200;
     if(!name || !fp){ await showMessage('이름과 지문 ID를 입력해주세요.'); return; }
     if(findStudentByFp(fp)){ await showMessage('이미 사용 중인 지문 ID입니다.'); return; }
-    const weeklySchedule = defaultWeekly();
-    DAYS.forEach(([key]) => {
-      const cb = document.querySelector(`.regDay[data-day="${key}"]`);
-      weeklySchedule[key] = { enabled: cb.checked, start: getTimeSelectValue('reg_'+key+'_s'), end: getTimeSelectValue('reg_'+key+'_e') };
-    });
-    await dbPut('students', { name, deskId, fingerprintId: fp, weeklySchedule, monthlyGoalMinutes: goal, monthlyElapsedSeconds:0, monthlyHistory:{} });
+    const weeklySchedule = readScheduleGridValues('reg');
+    await dbPut('students', { name, deskId, fingerprintId: fp, weeklySchedule, monthlyGoalMinutes: goal, monthlyElapsedSeconds:0, monthlyHistory:{}, seatMode });
     await loadStudents();
-    await logChange('학생 등록', `${name} (지문ID ${fp}${deskId!=null?', '+deskLabel(findDesk(deskId)):''})`);
+    await logChange('학생 등록', `${name} (지문ID ${fp}${deskId!=null?', '+deskLabel(findDesk(deskId)):''}, ${seatMode==='fixed'?'고정':'자율'})`);
     $('#newName').value=''; $('#newFp').value=''; $('#newGoal').value=1200;
-    resetRegScheduleGrid();
+    resetScheduleGrid('reg');
+    document.querySelector('input[name="newSeatMode"][value="fixed"]').checked = true;
+    toggleNewSeatField();
     renderAdminStudentList(); renderDeskOptions(); renderFloor();
   });
+
+  /* ---- 학생 정보 수정 ---- */
+  let editingStudentId = null;
+  function toggleEditSeatField(){
+    const modeEl = document.querySelector('input[name="editSeatMode"]:checked');
+    const mode = modeEl ? modeEl.value : 'fixed';
+    $('#editSeatField').style.display = mode === 'fixed' ? 'block' : 'none';
+  }
+  function renderEditDeskOptions(current){
+    const assignedIds = new Set(students.filter(s => s.seatMode !== 'flexible' && s.deskId != null && s.id !== current.id).map(s => s.deskId));
+    const avail = desks.filter(d => d.floor === 2 && !assignedIds.has(d.id));
+    $('#editSeat').innerHTML = '<option value="">미배정(추후 배정)</option>' + avail.map(d => `<option value="${d.id}">${deskLabel(d)}</option>`).join('');
+  }
+  $$('input[name="editSeatMode"]').forEach(r => r.addEventListener('change', toggleEditSeatField));
+  function openStudentEdit(studentId){
+    const s = students.find(x => x.id === studentId); if(!s) return;
+    editingStudentId = studentId;
+    $('#editName').value = s.name;
+    $('#editFp').value = s.fingerprintId;
+    $('#editGoal').value = s.monthlyGoalMinutes;
+    const modeVal = s.seatMode === 'flexible' ? 'flexible' : 'fixed';
+    const radio = document.querySelector(`input[name="editSeatMode"][value="${modeVal}"]`);
+    if(radio) radio.checked = true;
+    renderEditDeskOptions(s);
+    $('#editSeat').value = s.deskId != null ? String(s.deskId) : '';
+    setScheduleGridValues('edit', s.weeklySchedule);
+    toggleEditSeatField();
+    openOverlay('ovStudentEdit');
+  }
+  $('#editSaveBtn').addEventListener('click', async () => {
+    const s = students.find(x => x.id === editingStudentId); if(!s) return;
+    const name = $('#editName').value.trim();
+    const fp = parseInt($('#editFp').value);
+    const goal = parseInt($('#editGoal').value) || 1200;
+    const seatModeEl = document.querySelector('input[name="editSeatMode"]:checked');
+    const seatMode = seatModeEl ? seatModeEl.value : 'fixed';
+    const deskId = (seatMode === 'fixed' && $('#editSeat').value !== '') ? parseInt($('#editSeat').value) : null;
+    if(!name || !fp){ await showMessage('이름과 지문 ID를 입력해주세요.'); return; }
+    const dupe = findStudentByFp(fp);
+    if(dupe && dupe.id !== s.id){ await showMessage('이미 사용 중인 지문 ID입니다.'); return; }
+    s.name = name; s.fingerprintId = fp; s.monthlyGoalMinutes = goal; s.seatMode = seatMode; s.deskId = deskId;
+    s.weeklySchedule = readScheduleGridValues('edit');
+    await dbPut('students', s);
+    await loadStudents();
+    await logChange('학생 정보 수정', name);
+    closeOverlay('ovStudentEdit');
+    renderAdminStudentList(); renderDeskOptions(); renderFloor();
+  });
+
+  /* ---- 학생별 출결 이력 ---- */
+  async function openAttendanceHistory(studentId){
+    const s = students.find(x => x.id === studentId); if(!s) return;
+    $('#histTitle').textContent = s.name + '님의 출결 이력';
+    const records = (await dbGetAll('attendance')).filter(a => a.studentId === studentId).sort((a,b) => b.date.localeCompare(a.date));
+    const mPrefix = monthStr();
+    const now = new Date();
+    const monthDates = []; for(let d=1; d<=now.getDate(); d++){ monthDates.push(new Date(now.getFullYear(), now.getMonth(), d)); }
+    const scheduledDates = monthDates.filter(d => { const key = DAY_KEYS[d.getDay()]; return s.weeklySchedule[key] && s.weeklySchedule[key].enabled; }).map(d => d.toISOString().slice(0,10));
+    const recordDateSet = new Set(records.filter(r => r.date.startsWith(mPrefix)).map(r => r.date));
+    const absentCount = scheduledDates.filter(d => !recordDateSet.has(d)).length;
+    let lateCount = 0, presentDays = 0;
+    records.forEach(r => {
+      if(r.date.startsWith(mPrefix)) presentDays++;
+      const dayKey = DAY_KEYS[new Date(r.date+'T00:00:00').getDay()];
+      const sched = s.weeklySchedule[dayKey];
+      if(sched && sched.enabled && r.checkIn){
+        const ci = new Date(r.checkIn);
+        const [sh,sm] = sched.start.split(':').map(Number);
+        const target = new Date(ci); target.setHours(sh,sm,0,0);
+        if(ci > target) lateCount++;
+      }
+    });
+    $('#histSummary').textContent = `이번 달 출석 ${presentDays}일 · 지각 ${lateCount}회 · 결석(신청 후 미출석) ${absentCount}일`;
+    const list = $('#histList');
+    if(records.length === 0){ list.innerHTML = '<p class="muted">출결 기록이 없습니다.</p>'; }
+    else {
+      list.innerHTML = records.map(r => {
+        const elapsedMin = Math.round((r.elapsedSeconds||0)/60);
+        const deskInfo = r.deskId != null ? findDesk(r.deskId) : null;
+        return `<div class="list-item" style="flex-direction:column;align-items:flex-start;gap:2px;">
+          <div style="display:flex;justify-content:space-between;width:100%;"><b>${r.date}</b><span class="muted">${statusLabel(r.status)}</span></div>
+          <div class="muted">입실 ${fmtTime(r.checkIn)} · 퇴실 ${r.checkOut?fmtTime(r.checkOut):'-'} · ${elapsedMin}분${deskInfo?' · '+deskLabel(deskInfo):''}</div>
+        </div>`;
+      }).join('');
+    }
+    openOverlay('ovAttendanceHistory');
+  }
+
+  /* ---- 학생 일괄 등록 (엑셀) ---- */
+  $('#downloadTemplateBtn').addEventListener('click', () => {
+    const sample = [{
+      이름: '홍길동', 지문ID: 1, 월목표시간_분: 1200, 좌석유형: '고정',
+      월: '18:00-21:00', 화: '18:00-21:00', 수: '', 목: '18:00-21:00', 금: ''
+    }];
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(sample);
+    XLSX.utils.book_append_sheet(wb, ws, '학생등록양식');
+    XLSX.writeFile(wb, '학생등록_양식.xlsx');
+  });
+  $('#importStudentsFile').addEventListener('change', async e => {
+    const file = e.target.files[0]; if(!file) return;
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws);
+      if(rows.length === 0){ await showMessage('엑셀 파일에 데이터가 없습니다.'); e.target.value=''; return; }
+      const dayColMap = { 월:'mon', 화:'tue', 수:'wed', 목:'thu', 금:'fri' };
+      let added = 0; const skipped = [];
+      for(const row of rows){
+        const name = String(row['이름']||'').trim();
+        const fp = parseInt(row['지문ID']);
+        const goal = parseInt(row['월목표시간_분']) || 1200;
+        const seatModeRaw = String(row['좌석유형']||'').trim();
+        const seatMode = (seatModeRaw === '자율' || seatModeRaw.toLowerCase() === 'flexible') ? 'flexible' : 'fixed';
+        if(!name || !fp || isNaN(fp)){ skipped.push(`${name||'(이름없음)'}: 이름/지문ID 누락`); continue; }
+        if(findStudentByFp(fp)){ skipped.push(`${name}: 지문ID ${fp} 중복`); continue; }
+        const weeklySchedule = defaultWeekly();
+        Object.entries(dayColMap).forEach(([col,key]) => {
+          const val = String(row[col]||'').trim();
+          const m = val.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+          if(m){ weeklySchedule[key] = { enabled:true, start:m[1], end:m[2] }; }
+        });
+        await dbPut('students', { name, deskId:null, fingerprintId: fp, weeklySchedule, monthlyGoalMinutes: goal, monthlyElapsedSeconds:0, monthlyHistory:{}, seatMode });
+        added++;
+      }
+      await loadStudents();
+      await logChange('학생 일괄 등록', `${added}명 등록${skipped.length ? ', 실패 '+skipped.length+'건' : ''}`);
+      renderAdminStudentList(); renderDeskOptions(); renderFloor();
+      e.target.value = '';
+      await showMessage(`${added}명 등록 완료.` + (skipped.length ? `\n\n건너뜀:\n${skipped.join('\n')}` : ''));
+    }catch(err){ await showMessage('엑셀 처리 중 오류: '+err.message); e.target.value=''; }
+  });
+
+  /* ---- 지각/결석 통계 ---- */
+  async function computeLateAbsenceStats(){
+    const attendance = await dbGetAll('attendance');
+    const mPrefix = monthStr();
+    const now = new Date();
+    const monthDates = []; for(let d=1; d<=now.getDate(); d++){ monthDates.push(new Date(now.getFullYear(), now.getMonth(), d)); }
+    return students.map(s => {
+      const scheduledDates = monthDates.filter(d => { const key = DAY_KEYS[d.getDay()]; return s.weeklySchedule[key] && s.weeklySchedule[key].enabled; }).map(d => d.toISOString().slice(0,10));
+      const myRecords = attendance.filter(a => a.studentId === s.id && a.date.startsWith(mPrefix));
+      const recordDateSet = new Set(myRecords.map(r => r.date));
+      const absentCount = scheduledDates.filter(d => !recordDateSet.has(d)).length;
+      let lateCount = 0;
+      myRecords.forEach(r => {
+        const dayKey = DAY_KEYS[new Date(r.date+'T00:00:00').getDay()];
+        const sched = s.weeklySchedule[dayKey];
+        if(sched && sched.enabled && r.checkIn){
+          const ci = new Date(r.checkIn);
+          const [sh,sm] = sched.start.split(':').map(Number);
+          const target = new Date(ci); target.setHours(sh,sm,0,0);
+          if(ci > target) lateCount++;
+        }
+      });
+      return { name: s.name, lateCount, absentCount, scheduledCount: scheduledDates.length };
+    }).sort((a,b) => (b.lateCount+b.absentCount) - (a.lateCount+a.absentCount));
+  }
+  async function renderLateAbsenceStats(){
+    const stats = await computeLateAbsenceStats();
+    const el = $('#lateAbsenceList');
+    if(stats.length === 0){ el.innerHTML = '<p class="muted">등록된 학생이 없습니다.</p>'; return; }
+    el.innerHTML = stats.map(s => `
+      <div class="list-item">
+        <span>${s.name}</span>
+        <span class="muted">지각 ${s.lateCount}회 · 결석 ${s.absentCount}일 (신청 ${s.scheduledCount}일 중)</span>
+      </div>`).join('');
+  }
 
   /* ---- 비밀번호 변경 ---- */
   $('#changePwBtn').addEventListener('click', async () => {
@@ -1374,14 +1777,65 @@
   function handleSerialLine(line){
     if(!line) return; logSerial('수신: '+line);
     if(line.startsWith('MATCH:')) handleFingerprintMatch(line.split(':')[1]);
-    else if(line.startsWith('ENROLL_OK:')) logSerial('지문 등록 성공 (ID '+line.split(':')[1]+')');
-    else if(line.startsWith('ENROLL_FAIL')) logSerial('지문 등록 실패');
+    else if(line.startsWith('ENROLL_OK:')){
+      logSerial('지문 등록 성공 (ID '+line.split(':')[1]+')');
+      handleEnrollResult(true, line.split(':')[1]);
+    }
+    else if(line.startsWith('ENROLL_FAIL')){
+      logSerial('지문 등록 실패');
+      handleEnrollResult(false, null);
+    }
+  }
+  // 학생 목록에서 "지문 재등록"으로 시작한 등록인 경우, 기기 응답 결과를 해당 학생 레코드에 자동 반영
+  async function handleEnrollResult(success, respondedId){
+    if(pendingEnrollStudentId == null) return;
+    const s = students.find(x => x.id === pendingEnrollStudentId);
+    const statusEl = $('#feStatus');
+    if(success && s){
+      const finalId = pendingEnrollFpId != null ? pendingEnrollFpId : parseInt(respondedId);
+      s.fingerprintId = finalId;
+      await dbPut('students', s);
+      await loadStudents();
+      await logChange('지문 재등록', `${s.name} → 지문ID ${finalId}`);
+      if(statusEl) statusEl.textContent = `등록 성공! 지문 ID ${finalId}로 저장되었습니다.`;
+      renderAdminStudentList();
+    } else if(statusEl){
+      statusEl.textContent = '등록 실패. 손가락 위치를 확인하고 "등록 시작"을 다시 눌러주세요.';
+    }
+    pendingEnrollStudentId = null; pendingEnrollFpId = null;
   }
   $('#enrollBtn').addEventListener('click', async () => {
     const id = $('#enrollFpId').value;
     if(!id){ await showMessage('지문 ID를 입력해주세요.'); return; }
     if(!serialWriter){ await showMessage('기기가 연결되어 있지 않습니다.'); return; }
     await serialWriter.write('ENROLL:'+id+'\n'); logSerial('등록 명령 전송: ENROLL:'+id);
+  });
+
+  /* ---- 학생별 지문 재등록 ---- */
+  let enrollModalStudentId = null;
+  function openFingerprintEnroll(studentId){
+    const s = students.find(x => x.id === studentId); if(!s) return;
+    enrollModalStudentId = studentId;
+    pendingEnrollStudentId = null; pendingEnrollFpId = null;
+    $('#feName').textContent = s.name;
+    $('#feFpId').value = s.fingerprintId;
+    $('#feStatus').textContent = serialWriter
+      ? '기기가 연결되어 있습니다. 지문 ID를 확인한 뒤 "등록 시작"을 누르고 기기에 손가락을 올려주세요.'
+      : '기기가 연결되어 있지 않습니다. 관리자 패널 > 기기 연결 탭에서 먼저 연결해주세요.';
+    openOverlay('ovFingerprintEnroll');
+  }
+  $('#feStartBtn').addEventListener('click', async () => {
+    const s = students.find(x => x.id === enrollModalStudentId); if(!s) return;
+    const newId = parseInt($('#feFpId').value);
+    if(!newId || newId < 1 || newId > 199){ await showMessage('지문 ID는 1~199 사이 숫자로 입력해주세요.'); return; }
+    const dupe = findStudentByFp(newId);
+    if(dupe && dupe.id !== s.id){ await showMessage(`지문 ID ${newId}는 이미 ${dupe.name}님이 사용 중입니다.`); return; }
+    if(!serialWriter){ await showMessage('기기가 연결되어 있지 않습니다. 관리자 패널 > 기기 연결 탭에서 먼저 연결해주세요.'); return; }
+    pendingEnrollStudentId = s.id;
+    pendingEnrollFpId = newId;
+    $('#feStatus').textContent = '지문 등록 대기 중... 기기에 손가락을 올려주세요.';
+    await serialWriter.write('ENROLL:'+newId+'\n');
+    logSerial('등록 명령 전송 (재등록): ENROLL:'+newId+' → '+s.name);
   });
   $('#btnSimulate').addEventListener('click', async () => { const id = await showPrompt('시뮬레이션할 지문 ID를 입력하세요', '예: 7'); if(id) handleFingerprintMatch(id.trim()); });
 
@@ -1462,9 +1916,12 @@
     db = await openDB();
     await loadSettings();
     applyDarkMode();
-    buildRegScheduleGrid();
+    buildScheduleGrid('regScheduleGrid','reg');
+    buildScheduleGrid('editScheduleGrid','edit');
     await ensureDeskSchema();
     await loadStudents(); await loadDesks();
+    await ensureStudentSchema();
+    toggleNewSeatField(); renderDeskOptions();
     renderFloor(); updateClock();
     setInterval(updateClock, 15000);
     setInterval(() => { if(!layoutEditMode) renderFloor(); }, 30000);
