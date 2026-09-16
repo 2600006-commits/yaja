@@ -56,18 +56,20 @@
   .dot{ width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
   .dot.off{ background:#c8c8cc; } .dot.on{ background:#34c759; }
 
-  .floor-tabs{ display:flex; align-items:center; gap:8px; margin:0 12px 10px; padding:10px 14px; border-radius:999px; flex-wrap:wrap;}
-  .floor-tab{ border:none;background:rgba(120,120,128,0.14); padding:8px 16px;border-radius:999px;font-size:13px;cursor:pointer;font-family:inherit;}
-  .floor-tab.active{ background:var(--accent); color:#fff;}
-  .floor-summary{ margin-left:auto; font-size:12px; color:var(--text-secondary);}
-  .search-row{ margin:0 12px 12px; }
-  .search-row input{
-    width:100%; padding:11px 14px; border-radius:999px; border:1px solid rgba(120,120,128,0.25);
-    background:rgba(255,255,255,0.7); font-size:13px; font-family:inherit;
+  /* 상단 탭 및 검색창 스타일 변경 */
+  .floor-tabs { display:flex; align-items:center; gap:4px; background:rgba(120,120,128,0.1); padding:4px 6px; border-radius:999px; }
+  .floor-tab { border:none; background:transparent; padding:6px 14px; border-radius:999px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:600; color:var(--text-secondary); transition:all .2s;}
+  .floor-tab.active { background:var(--accent); color:#fff; }
+  .floor-summary { font-size:12px; color:var(--text-secondary); margin:0 8px; }
+
+  .search-row { position:relative; margin-right:8px; }
+  .search-row input {
+    width:140px; padding:9px 14px; border-radius:999px; border:1px solid rgba(120,120,128,0.25);
+    background:rgba(255,255,255,0.7); font-size:13px; font-family:inherit; transition: width 0.25s ease;
   }
-  .search-result-item{ padding:10px 14px; background:rgba(255,255,255,0.9); font-size:13px; cursor:pointer; border-bottom:1px solid rgba(120,120,128,0.15); }
-  .search-result-item:last-child{ border-bottom:none; }
-  .search-result-item:active{ background:rgba(120,120,128,0.18); }
+  .search-row input:focus { width:190px; outline:none; border-color:var(--accent); }
+  .search-result-item { padding:10px 14px; font-size:13px; cursor:pointer; border-bottom:1px solid rgba(120,120,128,0.15); transition:background .15s; background:rgba(255,255,255,0.9); }
+  .search-result-item:hover { background: rgba(0,0,0,0.05); }
 
   .legend{ display:flex; gap:14px; flex-wrap:wrap; padding:10px 20px; font-size:12px; color:var(--text-secondary); margin:0 12px 12px; border-radius:var(--radius-lg);}
   .legend span{ display:flex; align-items:center; gap:6px;}
@@ -87,9 +89,10 @@
   .grid-dot{ position:absolute; width:6px; height:6px; border-radius:50%; background:rgba(120,120,128,0.35); transform:translate(-50%,-50%); pointer-events:none; }
   #editHint{ margin:0 12px 10px; font-size:12px; color:var(--text-secondary); display:none; }
 
+  /* 좌석 크기 소폭 축소 */
   .desk{
-    position:absolute; width:80px; height:92px; transform:translate(-50%,-50%);
-    border-radius:16px; padding:6px; display:flex; flex-direction:column; justify-content:space-between;
+    position:absolute; width:66px; height:78px; transform:translate(-50%,-50%);
+    border-radius:14px; padding:6px; display:flex; flex-direction:column; justify-content:space-between;
     background:rgba(var(--seat-rgb,142,142,147),0.18);
     backdrop-filter:blur(14px) saturate(160%); -webkit-backdrop-filter:blur(14px) saturate(160%);
     transition:background .45s ease, box-shadow .2s ease; cursor:pointer; user-select:none; touch-action:none;
@@ -115,6 +118,12 @@
     position:absolute; top:-8px; right:-8px; width:22px; height:22px; border-radius:50%;
     background:#ff3b30; color:#fff; border:2px solid #fff; font-size:12px; line-height:1;
     display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:3;
+  }
+
+  /* 좌석 번호 표시용 뱃지 디자인 */
+  .desk-number {
+    position:absolute; bottom:6px; right:6px; font-size:10px; font-weight:700; color:var(--text-secondary);
+    background:rgba(255,255,255,0.7); padding:2px 4px; border-radius:6px; line-height:1; pointer-events:none;
   }
 
   .edit-toolbar{
@@ -189,6 +198,7 @@
     background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.15); color:#f2f2f5;
   }
   body.dark .list-item, body.dark .search-result-item{ background:rgba(255,255,255,0.06); color:#f2f2f5; }
+  body.dark .search-result-item:hover { background: rgba(255,255,255,0.1); }
   body.dark .day-sched-row{ background:rgba(255,255,255,0.06); }
   body.dark .day-sched-time select{ background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.15); color:#f2f2f5; }
   body.dark .btn-secondary{ background:rgba(255,255,255,0.12); color:#f2f2f5; }
@@ -196,16 +206,31 @@
   body.dark .desk{ box-shadow:0 2px 10px rgba(0,0,0,0.35); }
   body.dark .desk .d-name{ color:#fff; }
   body.dark .grid-dot{ background:rgba(255,255,255,0.25); }
+  body.dark .desk-number { background:rgba(0,0,0,0.4); color:#ccc; }
 </style>
 </head>
 <body>
 
 <header class="glass">
-  <div>
-    <h1>자율학습실</h1>
-    <div class="sub" id="clockText">--:--</div>
+  <!-- 좌측: 제목 및 1, 2층 버튼 -->
+  <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+    <div>
+      <h1>자율학습실</h1>
+      <div class="sub" id="clockText">--:--</div>
+    </div>
+    <div class="floor-tabs">
+      <button class="floor-tab active" data-floor="1">1층</button>
+      <button class="floor-tab" data-floor="2">2층</button>
+      <span class="floor-summary" id="floorSummary"></span>
+    </div>
   </div>
+  
+  <!-- 우측: 이름 검색 및 관리자 버튼들 -->
   <div class="header-actions">
+    <div class="search-row">
+      <input id="studentSearch" placeholder="학생 이름 검색">
+      <div id="searchResults" class="glass" style="display:none; position:absolute; top:100%; left:0; right:0; margin-top:6px; border-radius:12px; overflow:hidden; z-index:100; max-height:300px; overflow-y:auto; text-align:left;"></div>
+    </div>
     <span class="muted"><span class="dot off" id="serialDot"></span><span id="serialLabel">기기 미연결</span></span>
     <button class="btn btn-secondary" id="btnDarkToggle">🌙</button>
     <button class="btn btn-secondary" id="btnRules">야자 규정</button>
@@ -213,17 +238,6 @@
     <button class="btn btn-primary" id="btnAdmin">관리자 모드</button>
   </div>
 </header>
-
-<div class="floor-tabs glass">
-  <button class="floor-tab active" data-floor="1">1층</button>
-  <button class="floor-tab" data-floor="2">2층</button>
-  <span class="floor-summary" id="floorSummary"></span>
-</div>
-
-<div class="search-row">
-  <input id="studentSearch" placeholder="학생 이름으로 검색">
-  <div id="searchResults" style="display:none;margin-top:6px;border-radius:16px;overflow:hidden;"></div>
-</div>
 
 <div id="todaySummary" class="muted" style="margin:0 12px 10px;font-size:12px;"></div>
 
@@ -751,6 +765,10 @@
   function findStudentByFp(fpId){ return students.find(s => String(s.fingerprintId) === String(fpId)); }
   function findDesk(id){ return desks.find(d => d.id === id); }
   function deskLabel(desk){
+    // 좌석 번호가 명시되어 있다면 번호 우선 반환
+    if (desk.seatNumber) return `${desk.floor}층 ${desk.seatNumber}번 (${desk.type==='partition'?'칸막이':'오픈형'})`;
+    
+    // 번호가 없다면 기존 방식대로 층 내의 생성 순서대로 표기
     const sameFloor = desks.filter(d=>d.floor===desk.floor).sort((a,b)=>a.id-b.id);
     const idx = sameFloor.findIndex(d=>d.id===desk.id)+1;
     return `${desk.floor}층 ${desk.type==='partition'?'칸막이':'오픈형'} #${idx}`;
@@ -760,7 +778,7 @@
     for(const floor of [1,2]){
       for(let r=0;r<3;r++){
         for(let c=0;c<4;c++){
-          await dbPut('desks', { floor, type: (r===2?'partition':'open'), col:c, row:r });
+          await dbPut('desks', { floor, type: (r===2?'partition':'open'), col:c, row:r, seatNumber:null });
         }
       }
     }
@@ -775,8 +793,8 @@
     }
   }
 
-  /* ---------------- 셀(칸) 기반 배치 시스템 ---------------- */
-  const GRID_COLS = 10, GRID_ROWS = 10, CELL_W = 92, CELL_H = 104, CELL_PAD = 24;
+  /* ---------------- 셀(칸) 기반 배치 시스템 (15x11) ---------------- */
+  const GRID_COLS = 15, GRID_ROWS = 11, CELL_W = 76, CELL_H = 88, CELL_PAD = 16;
   function canvasPixelSize(){ return { width: GRID_COLS*CELL_W + CELL_PAD*2, height: GRID_ROWS*CELL_H + CELL_PAD*2 }; }
   function cellToPos(col,row){ return { x: CELL_PAD + col*CELL_W + CELL_W/2, y: CELL_PAD + row*CELL_H + CELL_H/2 }; }
   function posToCell(px,py){
@@ -899,10 +917,10 @@
   }
 
   /* ---------------- 좌석 배치 모드 ---------------- */
-  async function addDesk(floor,type,col,row){
-    await dbPut('desks', { floor, type, col, row });
+  async function addDesk(floor, type, col, row, seatNumber) {
+    await dbPut('desks', { floor, type, col, row, seatNumber: seatNumber || null });
     await loadDesks();
-    await logChange('좌석 추가', `${floor}층 ${type==='partition'?'칸막이':'오픈형'}`);
+    await logChange('좌석 추가', `${floor}층 ${type==='partition'?'칸막이':'오픈형'}${seatNumber ? ' ' + seatNumber + '번' : ''}`);
     renderFloor();
   }
   async function deleteDesk(id){
@@ -1002,6 +1020,7 @@
       cell.className = 'desk type-' + desk.type + ' ' + status + (isLate ? ' late' : '');
       const pos = cellToPos(desk.col, desk.row);
       cell.style.left = pos.x+'px'; cell.style.top = pos.y+'px';
+      
       if(student){
         const checkIn = record ? fmtTime(record.checkIn) : '-';
         const checkOut = record && record.checkOut ? fmtTime(record.checkOut) : '-';
@@ -1019,8 +1038,17 @@
         cell.dataset.studentName = student.name;
         if(expectedNotArrived){ const dot = document.createElement('span'); dot.className='expected-dot'; dot.title='오늘 신청함'; cell.appendChild(dot); }
       } else {
-        cell.innerHTML = `<span class="badge">${desk.type==='partition'?'칸막이':'오픈형'}</span><div class="muted" style="font-size:10px;">미배정</div>`;
+        cell.innerHTML = `<span class="badge">${desk.type==='partition'?'칸막이':'오픈형'}</span><div class="muted" style="font-size:10px; margin-top:14px;">미배정</div>`;
       }
+      
+      // 좌석 번호가 있으면 화면에 뱃지로 추가
+      if (desk.seatNumber) {
+        const numEl = document.createElement('div');
+        numEl.className = 'desk-number';
+        numEl.textContent = desk.seatNumber;
+        cell.appendChild(numEl);
+      }
+      
       cell.dataset.deskId = desk.id;
       if(layoutEditMode) attachDeskEditEvents(cell, desk, canvas);
       else attachDeskEvents(cell, desk);
@@ -1094,7 +1122,9 @@
     delBtn.addEventListener('click', async e => { e.stopPropagation(); if(await showConfirm('이 책상을 삭제하시겠습니까?')) await deleteDesk(desk.id); });
     cell.appendChild(delBtn);
   }
-  $('#deskCanvas').addEventListener('click', e => {
+  
+  // 캔버스 클릭 시(좌석 추가) 프롬프트 띄우기
+  $('#deskCanvas').addEventListener('click', async e => {
     if(!layoutEditMode) return;
     if(e.target.id !== 'deskCanvas') return;
     const canvas = $('#deskCanvas');
@@ -1102,7 +1132,11 @@
     const px = e.clientX-rect.left, py = e.clientY-rect.top;
     const { col, row } = posToCell(px, py);
     const slot = resolveOverlapCell(col, row, currentFloor, null);
-    addDesk(currentFloor, newDeskType, slot.col, slot.row);
+    
+    const seatNum = await showPrompt('좌석 번호를 입력하세요 (번호가 없으면 빈칸)', '예: 1');
+    if (seatNum === null) return; // 사용자가 취소를 누른 경우 추가 중단
+    
+    addDesk(currentFloor, newDeskType, slot.col, slot.row, seatNum.trim());
   });
 
   /* ---------------- 랭킹 ---------------- */
