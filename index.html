@@ -56,7 +56,7 @@
   .dot{ width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
   .dot.off{ background:#c8c8cc; } .dot.on{ background:#34c759; }
 
-  /* 상단 탭 및 검색창 스타일 변경 */
+  /* 상단 탭 및 검색창 스타일 */
   .floor-tabs { display:flex; align-items:center; gap:4px; background:rgba(120,120,128,0.1); padding:4px 6px; border-radius:999px; }
   .floor-tab { border:none; background:transparent; padding:6px 14px; border-radius:999px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:600; color:var(--text-secondary); transition:all .2s;}
   .floor-tab.active { background:var(--accent); color:#fff; }
@@ -419,7 +419,11 @@
 
     <div class="tabpane" id="tab-log">
       <h3>관리자 변경 이력</h3>
-      <p class="muted">학생 정보, 좌석 배정, 출결 등을 누가 언제 수정했는지 최신순으로 기록됩니다.</p>
+      <p class="muted">조회할 날짜를 선택하면 해당 일자의 이력만 표시되며, 엑셀로 다운로드할 수 있습니다.</p>
+      <div class="row" style="margin-bottom:12px;">
+        <div class="field" style="margin-bottom:0;"><input type="date" id="logDateFilter"></div>
+        <button class="btn btn-secondary" id="exportLogExcelBtn" style="white-space:nowrap; height:44px;">엑셀 다운로드</button>
+      </div>
       <div id="changeLogList"></div>
     </div>
 
@@ -581,8 +585,7 @@
   const DAYS = [['mon','월'],['tue','화'],['wed','수'],['thu','목'],['fri','금']];
   $$('.close-x').forEach(b => b.addEventListener('click', () => closeOverlay(b.dataset.close)));
 
-  /* ---------------- 커스텀 다이얼로그 (브라우저 기본 alert/confirm/prompt는
-     일부 태블릿·웹뷰 환경에서 차단되어 버튼이 먹통처럼 보일 수 있어 자체 구현) ---------------- */
+  /* ---------------- 커스텀 다이얼로그 ---------------- */
   function showMessage(msg){
     return new Promise(resolve => {
       $('#msgText').textContent = msg;
@@ -662,10 +665,7 @@
 
   function defaultWeekly(){ const w={}; DAYS.forEach(([k])=>w[k]={enabled:false,start:'18:00',end:'21:00'}); return w; }
 
-  /* ---------------- 시간 선택 UI (select 기반, 태블릿/웹뷰에서도 항상 값이 확실히 기록되도록) ----------------
-     일부 태블릿/웹뷰 환경에서는 <input type="time">이 정상 동작하지 않거나(값이 비어있거나 반영이 안 됨)
-     화면에 오후/오전 표기만 나오고 실제 값이 저장되지 않는 문제가 있어, 신뢰성이 높은 select 방식으로 대체.
-     시/분을 하나의 select로 합쳐 작은 화면에서도 한 줄에 들어가도록 함 */
+  /* ---------------- 시간 선택 UI ---------------- */
   function timeLabel(h,m){
     const ampm = h<12 ? '오전' : '오후';
     const h12 = h%12===0 ? 12 : h%12;
@@ -743,13 +743,13 @@
       settings = { key:'app', adminPassword:'0000', currentDate: todayStr(), studyEndTime:'22:00', lastBackupReminderDate:null, rulesText:'', darkMode:false };
       await dbPut('settings', settings);
     }
-    if(settings.rulesText === undefined) settings.rulesText = ''; // 이전 버전 데이터 호환
+    if(settings.rulesText === undefined) settings.rulesText = ''; 
     if(settings.darkMode === undefined) settings.darkMode = false;
   }
   async function saveSettings(){ await dbPut('settings', settings); }
   async function loadStudents(){ students = await dbGetAll('students'); }
   async function loadDesks(){ desks = await dbGetAll('desks'); }
-  // 이전 버전 데이터 호환: seatMode(고정/자율) 필드가 없으면 기존 좌석 배정 여부로 추론해 채워넣음
+  
   async function ensureStudentSchema(){
     let changed = false;
     for(const s of students){
@@ -783,7 +783,6 @@
       }
     }
   }
-  // 구버전(퍼센트 좌표) 데이터가 남아있으면 새 셀 기반 구조로 초기화
   async function ensureDeskSchema(){
     const existing = await dbGetAll('desks');
     if(existing.length === 0){ await seedDefaultDesks(); return; }
@@ -817,16 +816,10 @@
         }
       }
     }
-    return {col,row}; // 격자가 완전히 가득 찬 경우
+    return {col,row}; 
   }
 
-  /* ---------------- 출결 로직 ----------------
-     좌석 유형(seatMode)
-     - fixed(고정좌석, 2층 전용): 학생 레코드의 deskId가 항상 같은 자리를 가리킴. 매일 그 자리에서 기록.
-     - flexible(자율, 1층/2층 유동): 학생 본인 소유의 고정 자리가 없음. 매일 처음 지문을 찍을 때
-       "전체 시간"(2층 빈자리 자동배정) / "일부 시간"(1층 빈자리 순서대로 자동배정)을 선택하고,
-       그 날의 attendance 레코드에만 deskId를 기록한다. 하루가 지나면 새 레코드가 필요하므로
-       1층/2층 유동 배정은 자연스럽게 매일 초기화된다. ---------------- */
+  /* ---------------- 출결 로직 ---------------- */
   async function getTodayAttendance(studentId){ return await dbIndexGet('attendance','studentDate', studentId+'_'+todayStr()); }
   async function getTodayRecords(){ return (await dbGetAll('attendance')).filter(a => a.date === todayStr()); }
   function occupiedDeskIdSet(todayRecords){
@@ -840,7 +833,6 @@
     const floorDesks = desks.filter(d => d.floor === floor).sort((a,b) => a.id - b.id);
     return floorDesks.find(d => !occupied.has(d.id)) || null;
   }
-  // 특정 책상의 "오늘의 실제 사용자"를 찾음: 고정좌석 학생 우선, 없으면 오늘자 유동배정 기록에서 찾음
   async function getDeskOccupant(deskId, todayRecords){
     todayRecords = todayRecords || await getTodayRecords();
     const fixedStudent = students.find(s => s.seatMode === 'fixed' && s.deskId === deskId);
@@ -1055,7 +1047,6 @@
       canvas.appendChild(cell);
     }
 
-    /* ---- 작은 화면 자동 맞춤: 사용 중인 좌석 범위만 계산해 컨테이너 너비에 맞게 축소 ---- */
     const useFit = fitToScreen && !layoutEditMode && !opts.fullView;
     if(useFit){
       const margin = 1;
@@ -1095,7 +1086,7 @@
   function attachDeskEditEvents(cell, desk, canvas){
     let dragging = false;
     cell.addEventListener('pointerdown', e => {
-      if(e.target.closest('.del-btn')) return; // 삭제 버튼 클릭 시에는 드래그를 시작하지 않음 (버그 수정)
+      if(e.target.closest('.del-btn')) return;
       dragging = true; cell.setPointerCapture(e.pointerId); cell.style.zIndex = 8;
     });
     cell.addEventListener('pointermove', e => {
@@ -1134,7 +1125,7 @@
     const slot = resolveOverlapCell(col, row, currentFloor, null);
     
     const seatNum = await showPrompt('좌석 번호를 입력하세요 (번호가 없으면 빈칸)', '예: 1');
-    if (seatNum === null) return; // 사용자가 취소를 누른 경우 추가 중단
+    if (seatNum === null) return;
     
     addDesk(currentFloor, newDeskType, slot.col, slot.row, seatNum.trim());
   });
@@ -1176,7 +1167,7 @@
   async function computeDailyTotals(){
     const attendance = await dbGetAll('attendance');
     const mPrefix = monthStr();
-    const totals = {}; // date -> minutes
+    const totals = {}; 
     attendance.filter(a => a.date && a.date.startsWith(mPrefix)).forEach(a => {
       let secs = a.elapsedSeconds || 0;
       if(a.status !== 'left' && a.checkIn) secs = Math.max(secs, Math.round((Date.now()-a.checkIn)/1000));
@@ -1236,20 +1227,56 @@
     await showMessage('감독 일지가 저장되었습니다.');
   });
 
-  /* ---------------- 관리자 변경 이력 ---------------- */
+  /* ---------------- 관리자 변경 이력 (일자별 조회 및 엑셀 다운로드 추가) ---------------- */
   async function renderChangeLog(){
-    const logs = (await dbGetAll('changelog')).sort((a,b)=>b.timestamp-a.timestamp).slice(0,200);
+    let dateStr = $('#logDateFilter').value;
+    if(!dateStr){ dateStr = todayStr(); $('#logDateFilter').value = dateStr; }
+    
+    const allLogs = await dbGetAll('changelog');
+    const logs = allLogs.filter(l => {
+      const d = new Date(l.timestamp);
+      const datePart = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      return datePart === dateStr;
+    }).sort((a,b)=>b.timestamp-a.timestamp);
+    
     const list = $('#changeLogList');
-    if(logs.length===0){ list.innerHTML = '<p class="muted">기록된 변경 이력이 없습니다.</p>'; return; }
+    if(logs.length===0){ list.innerHTML = '<p class="muted">선택한 날짜에 기록된 변경 이력이 없습니다.</p>'; return; }
     list.innerHTML = logs.map(l => `
       <div class="list-item" style="flex-direction:column;align-items:flex-start;gap:2px;">
         <div style="display:flex;justify-content:space-between;width:100%;">
           <b>${l.action}</b>
-          <span class="muted">${new Date(l.timestamp).toLocaleString('ko-KR',{hour:'2-digit',minute:'2-digit',month:'numeric',day:'numeric'})}</span>
+          <span class="muted">${new Date(l.timestamp).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}</span>
         </div>
         <div class="muted">${l.admin} · ${l.detail||''}</div>
       </div>`).join('');
   }
+  $('#logDateFilter').addEventListener('change', renderChangeLog);
+  
+  $('#exportLogExcelBtn').addEventListener('click', async () => {
+    let dateStr = $('#logDateFilter').value || todayStr();
+    const allLogs = await dbGetAll('changelog');
+    const logs = allLogs.filter(l => {
+      const d = new Date(l.timestamp);
+      const datePart = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      return datePart === dateStr;
+    }).sort((a,b)=>a.timestamp-b.timestamp); // 엑셀은 과거->최신순 정렬이 가독성이 좋음
+    
+    if(logs.length === 0){ await showMessage('다운로드할 이력이 없습니다.'); return; }
+    
+    const exportData = logs.map(l => ({
+      '날짜': new Date(l.timestamp).toLocaleDateString('ko-KR'),
+      '시간': new Date(l.timestamp).toLocaleTimeString('ko-KR'),
+      '관리자': l.admin,
+      '작업': l.action,
+      '상세내용': l.detail || ''
+    }));
+    
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    ws['!cols'] = [{wch:12}, {wch:12}, {wch:10}, {wch:15}, {wch:40}];
+    XLSX.utils.book_append_sheet(wb, ws, '변경이력');
+    XLSX.writeFile(wb, `변경이력_${dateStr}.xlsx`);
+  });
 
   /* ---------------- 오늘 신청 현황 / 지각 판정 ---------------- */
   function isScheduledToday(student){
@@ -1524,7 +1551,7 @@
 
   /* ---- 학생 관리 ---- */
   function renderDeskOptions(){
-    // 고정좌석은 2층 전용 정책: 2층 중 다른 고정좌석 학생이 쓰지 않는 자리만 노출
+    // 고정좌석은 2층 전용 정책
     const assignedIds = new Set(students.filter(s => s.seatMode !== 'flexible' && s.deskId != null).map(s => s.deskId));
     const avail = desks.filter(d => d.floor === 2 && !assignedIds.has(d.id));
     $('#newSeat').innerHTML = '<option value="">미배정(추후 배정)</option>' + avail.map(d => `<option value="${d.id}">${deskLabel(d)}</option>`).join('');
@@ -1820,7 +1847,7 @@
       handleEnrollResult(false, null);
     }
   }
-  // 학생 목록에서 "지문 재등록"으로 시작한 등록인 경우, 기기 응답 결과를 해당 학생 레코드에 자동 반영
+  
   async function handleEnrollResult(success, respondedId){
     if(pendingEnrollStudentId == null) return;
     const s = students.find(x => x.id === pendingEnrollStudentId);
